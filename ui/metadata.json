@@ -1,0 +1,47 @@
+{
+  "name": "monero_merchant_ui",
+  "display_name": "Monero Merchant",
+  "version": "0.1.0",
+  "type": "ui_qml",
+  "interface": "universal",
+  "category": "wallet",
+  "description": "Wallet connection, POS pairing, Stagenet invoices and payment tracking",
+  "main": "monero_merchant_ui_plugin",
+  "icon": "src/icons/icon.png",
+  "view": "qml/Main.qml",
+  "dependencies": [
+    {
+      "name": "monero_merchant",
+      "version": "0.1.0"
+    }
+  ],
+  "dependency_overrides": {
+    "monero_merchant": {
+      "input": "merchant_source",
+      "file": "src/monero_merchant_impl.h",
+      "impl_class": "MoneroMerchantImpl"
+    }
+  },
+  "provides": [],
+  "uses": [],
+  "codegen": {
+    "rep": "src/monero_merchant_ui.rep"
+  },
+  "nix": {
+    "packages": {
+      "build": [
+        "pkg-config"
+      ],
+      "runtime": [
+        "qrencode"
+      ]
+    },
+    "external_libraries": [],
+    "cmake": {
+      "find_packages": [],
+      "extra_sources": [],
+      "extra_include_dirs": [],
+      "extra_link_libraries": []
+    }
+  }
+}

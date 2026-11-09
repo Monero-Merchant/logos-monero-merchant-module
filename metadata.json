@@ -1,0 +1,54 @@
+{
+  "name": "monero_merchant",
+  "display_name": "Monero Merchant POS PoC",
+  "version": "0.1.0",
+  "type": "core",
+  "interface": "universal",
+  "category": "wallet",
+  "description": "Persistent Stagenet invoices and incoming payments through native Logos IPC",
+  "main": "monero_merchant_plugin",
+  "dependencies": [
+    {
+      "name": "monero_wallet_backend",
+      "version": "0.1.1"
+    },
+    {
+      "name": "delivery_module",
+      "version": "0.3.3"
+    },
+    {
+      "name": "libp2p_module",
+      "version": "1.0.0"
+    }
+  ],
+  "dependency_overrides": {
+    "monero_wallet_backend": {
+      "file": "interfaces/monero_wallet_backend.lidl"
+    },
+    "delivery_module": {
+      "input": "delivery_module",
+      "file": "src/delivery_module_plugin.h",
+      "impl_class": "DeliveryModuleImpl"
+    },
+    "libp2p_module": {
+      "file": "interfaces/libp2p_module.lidl"
+    }
+  },
+  "nix": {
+    "packages": {
+      "build": [],
+      "runtime": [
+        "sqlite",
+        "openssl"
+      ]
+    },
+    "external_libraries": [],
+    "cmake": {
+      "find_packages": [],
+      "extra_sources": [],
+      "extra_include_dirs": [],
+      "extra_link_libraries": []
+    }
+  },
+  "icon": "src/icons/icon.png"
+}

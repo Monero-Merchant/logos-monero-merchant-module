@@ -1,0 +1,17 @@
+class MoneroMerchantUi
+{
+    SLOT(QString getWalletStatus())
+    SLOT(QString getInvoices())
+    SLOT(QString setConfirmationPolicy(int confirmations))
+    SLOT(QString createInvoice(QString requestId, QString title, QString amountXmr))
+    SLOT(QString recoverInvoice(QString invoiceId))
+    SLOT(QString refreshInvoices())
+    SLOT(QString acknowledgeInvoiceReview(QString invoiceId))
+    SLOT(QString paymentQr(QString paymentUri))
+    SLOT(QString getPosPairing())
+    SLOT(QString createPosInvitation())
+    SLOT(QString approvePosDevice(QString peerId))
+    SLOT(QString revokePosDevice(QString peerId))
+    SLOT(QString pairingQr(QString invitation))
+    PROP(QString invoices="{}" READONLY)
+}

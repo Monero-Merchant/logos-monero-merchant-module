@@ -1,0 +1,15 @@
+module monero_wallet_backend {
+  version "0.1.1"
+  description "Monero wallet backend 0.1.1 compatibility contract for the merchant PoC"
+  category "wallet"
+  depends []
+
+  method wallet_status() -> tstr
+  method create_subaddress(account_index: int, label: tstr) -> tstr
+  method history() -> tstr
+  method receive_info(account_index: int) -> tstr
+
+  event balance_changed(payload: tstr)
+  event sync_progress(payload: tstr)
+  event wallet_state_changed(payload: tstr)
+}

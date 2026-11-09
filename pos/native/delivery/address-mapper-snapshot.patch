@@ -1,0 +1,15 @@
+--- a/libp2p/address_manager.nim
++++ b/libp2p/address_manager.nim
+@@ -468,7 +468,11 @@
+   for address in addrs:
+     produced.mgetOrPut(address, {}).incl(AddrSource.Listen)
+ 
+-  for sourced in self.mappers:
++  # A mapper can suspend while NAT/reachability services add or remove mappers.
++  # Keep an independent sequence alive across awaits; mutating the live sequence
++  # while iterating otherwise raises a fatal assertion (or invalidates storage).
++  let mappers = self.mappers.mapIt(it)
++  for sourced in mappers:
+     let mapped = await sourced.mapper(addrs)
+     for address in mapped.filterIt(it notin addrs):
+       produced.mgetOrPut(address, {}).incl(sourced.source)

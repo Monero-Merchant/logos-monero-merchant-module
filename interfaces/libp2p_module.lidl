@@ -1,0 +1,69 @@
+module libp2p_module {
+  version "1.0.0"
+  description "Libp2p network protocol module for Logos"
+  category "protocol"
+  depends []
+
+  method setLogLevel(level: tstr) -> result
+  method ok() -> bool
+  method status() -> result
+  method createNode(config: tstr) -> result
+  method getNodeInfo(field: tstr) -> result
+  method start() -> result
+  method stop() -> result
+  method newPrivateKey(scheme: tstr) -> result
+  method publicKey() -> result
+  method connectPeer(peerId: tstr, multiaddrs: [tstr], timeoutMs: int) -> result
+  method disconnectPeer(peerId: tstr) -> result
+  method peerInfo() -> result
+  method connectedPeers(direction: int) -> result
+  method dial(peerId: tstr, proto: tstr) -> result
+  method dialWithAddrs(peerId: tstr, multiaddrs: [tstr], proto: tstr, forceDial: bool, timeoutMs: int) -> result
+  method circuitRelayReserve(relayPeerId: tstr, relayAddrs: [tstr]) -> result
+  method dialCircuitRelay(dstPeerId: tstr, multiaddr: tstr, proto: tstr) -> result
+  method mountProtocol(proto: tstr) -> result
+  method streamReadExactly(streamId: uint, len: uint) -> result
+  method streamReadLp(streamId: uint, maxSize: uint) -> result
+  method streamWrite(streamId: uint, data: tstr) -> result
+  method streamWriteLp(streamId: uint, data: tstr) -> result
+  method streamClose(streamId: uint) -> result
+  method streamCloseWithEOF(streamId: uint) -> result
+  method streamRelease(streamId: uint) -> result
+  method protocolRequest(argsJson: tstr) -> result
+  method pingPeer(peerId: tstr, timeoutMs: int) -> result
+  method streamReadLpJson(argsJson: tstr) -> result
+  method streamWriteLpJson(argsJson: tstr) -> result
+  method streamCloseJson(argsJson: tstr) -> result
+  method streamReleaseJson(argsJson: tstr) -> result
+  method protocolAcceptStream(argsJson: tstr) -> result
+  method gossipsubPublish(topic: tstr, data: tstr) -> result
+  method gossipsubSubscribe(topic: tstr) -> result
+  method gossipsubUnsubscribe(topic: tstr) -> result
+  method gossipsubNextMessage(topic: tstr, timeoutMs: int) -> result
+  method toCid(key: tstr) -> result
+  method kadFindNode(peerId: tstr) -> result
+  method kadPutValue(key: tstr, value: tstr) -> result
+  method kadGetValue(key: tstr, quorum: int) -> result
+  method kadAddProvider(cid: tstr) -> result
+  method kadStartProviding(cid: tstr) -> result
+  method kadStopProviding(cid: tstr) -> result
+  method kadGetProviders(cid: tstr) -> result
+  method kadGetRandomRecords() -> result
+  method discoStart() -> result
+  method discoStop() -> result
+  method discoStartAdvertising(serviceId: tstr, serviceData: tstr, advertisement: tstr) -> result
+  method discoStopAdvertising(serviceId: tstr) -> result
+  method discoRegisterInterest(serviceId: tstr) -> result
+  method discoUnregisterInterest(serviceId: tstr) -> result
+  method discoLookup(serviceId: tstr, serviceData: tstr) -> result
+  method discoRandomLookup() -> result
+  method createXpr(addrs: [tstr], services: {tstr: bstr}, seqNo: uint) -> result
+  method decodeXpr(xpr: tstr) -> result
+  method peerstoreGetPeers() -> result
+  method peerstoreGetPeerInfo(peerId: tstr) -> result
+  method peerstoreAddPeer(peerId: tstr, addrs: [tstr], protos: [tstr]) -> result
+  method peerstoreSetPeerAddresses(peerId: tstr, addrs: [tstr]) -> result
+  method peerstoreSetPeerProtocols(peerId: tstr, protos: [tstr]) -> result
+  method peerstoreDeletePeer(peerId: tstr) -> result
+  method collectMetrics() -> {tstr: any}
+}

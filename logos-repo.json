@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "name": "monero-merchant",
+  "displayName": "Monero Merchant",
+  "homepage": "https://github.com/Monero-Merchant/logos-monero-merchant-module",
+  "indexUrl": "https://raw.githubusercontent.com/Monero-Merchant/logos-monero-merchant-module/refs/heads/main/index.json",
+  "trustedSigners": []
+}

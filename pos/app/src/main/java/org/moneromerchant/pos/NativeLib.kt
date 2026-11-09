@@ -1,0 +1,11 @@
+package org.moneromerchant.pos
+
+/** Blocking liblogosdelivery calls. MerchantConnection serializes them on Dispatchers.IO. */
+object NativeLib {
+    init { System.loadLibrary("merchant_delivery") }
+    external fun open(config: String): Long
+    external fun subscribe(handle: Long, topic: String)
+    external fun send(handle: Long, message: String)
+    external fun receive(handle: Long, timeoutMs: Int): String?
+    external fun close(handle: Long)
+}

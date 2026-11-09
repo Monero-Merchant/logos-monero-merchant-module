@@ -1,0 +1,8 @@
+/result
+/result-*
+/ui/result
+/ui/result-*
+
+.DS_Store
+
+/artifacts/

@@ -1,15 +1,15 @@
 {
   "schemaVersion": 2,
   "repositoryName": "monero-merchant",
-  "generatedAt": "2026-11-10T00:39:09Z",
+  "generatedAt": "2026-11-10T11:03:48Z",
   "packages": [
     {
       "name": "delivery_module",
       "versions": [
         {
-          "releasedAt": "2026-11-10T00:37:43Z",
+          "releasedAt": "2026-11-10T11:02:32Z",
           "publisherRef": "delivery_module-v0.3.3",
-          "url": "https://github.com/Monero-Merchant/logos-monero-merchant-module/releases/download/v0.1.0/logos-delivery_module-module-lib.lgx",
+          "url": "https://github.com/Monero-Merchant/logos-monero-merchant-module/releases/download/v0.2.0/logos-delivery_module-module-lib.lgx",
           "size": 24289878,
           "sha256": "11fa34628f45a9c5801900fd074da60f5599fc040bc0a45c09574b767d406423",
           "rootHash": "7e87d5c8f5f1f417c7420faad7bf4c161f6adb550d06c4e74bb711004be2c91a",
@@ -39,7 +39,7 @@
             "version": "0.3.3"
           },
           "urls": [
-            "https://github.com/Monero-Merchant/logos-monero-merchant-module/releases/download/v0.1.0/logos-delivery_module-module-lib.lgx"
+            "https://github.com/Monero-Merchant/logos-monero-merchant-module/releases/download/v0.2.0/logos-delivery_module-module-lib.lgx"
           ]
         }
       ]
@@ -48,9 +48,9 @@
       "name": "libp2p_module",
       "versions": [
         {
-          "releasedAt": "2026-11-10T00:37:43Z",
+          "releasedAt": "2026-11-10T11:02:32Z",
           "publisherRef": "libp2p_module-v1.0.0",
-          "url": "https://github.com/Monero-Merchant/logos-monero-merchant-module/releases/download/v0.1.0/logos-libp2p_module-module-lib.lgx",
+          "url": "https://github.com/Monero-Merchant/logos-monero-merchant-module/releases/download/v0.2.0/logos-libp2p_module-module-lib.lgx",
           "size": 11223401,
           "sha256": "7674d0ac82f67119089895aadef4069bc6164c4d6b3a425f6e6f9b2330fecaae",
           "rootHash": "78c301151f04920bb4bbb202024f3bbac932fa766e146a3a80a1d74559d568a4",
@@ -76,7 +76,7 @@
             "version": "1.0.0"
           },
           "urls": [
-            "https://github.com/Monero-Merchant/logos-monero-merchant-module/releases/download/v0.1.0/logos-libp2p_module-module-lib.lgx"
+            "https://github.com/Monero-Merchant/logos-monero-merchant-module/releases/download/v0.2.0/logos-libp2p_module-module-lib.lgx"
           ]
         }
       ]
@@ -85,12 +85,12 @@
       "name": "monero_merchant",
       "versions": [
         {
-          "releasedAt": "2026-11-10T00:37:43Z",
+          "releasedAt": "2026-11-10T11:02:32Z",
           "publisherRef": "monero_merchant-v0.1.0",
-          "url": "https://github.com/Monero-Merchant/logos-monero-merchant-module/releases/download/v0.1.0/logos-monero_merchant-module-lib.lgx",
-          "size": 5791694,
-          "sha256": "5099310594c3393b4d8271e5c6eb7c0b26db4acc366951035ede63a461dcd3a0",
-          "rootHash": "ecd5d0f3c1c1b42e895347d178fd54efef9569e5a001c640cd70ed676eed6435",
+          "url": "https://github.com/Monero-Merchant/logos-monero-merchant-module/releases/download/v0.2.0/logos-monero_merchant-module-lib.lgx",
+          "size": 5793112,
+          "sha256": "6d8abb892f11445e1b10cf327893f46cb304b4e1fee44e58e559cfa3b4baa177",
+          "rootHash": "037756d97462ce1723b6c7e8288cb5f6ceba64164cb1394cfc78b0b3f89d4f04",
           "manifest": {
             "author": "",
             "category": "wallet",
@@ -112,9 +112,9 @@
             "display_name": "Monero Merchant POS PoC",
             "hashes": {
               "assets": "f9d595bc2f64ae589bbb4944b3daae8a681b69bab72adf2116800b57316fd020",
-              "root": "ecd5d0f3c1c1b42e895347d178fd54efef9569e5a001c640cd70ed676eed6435",
-              "variants": "bc492a02c36f20586002a2087c6f7748f7276a2ec0a9eb5578ac3e4e8962dbc5",
-              "variants/darwin-arm64": "e010faf7dcae0453b03a9e1bc98d9e8b57549313efe372ff28d51a5d48fe2048"
+              "root": "037756d97462ce1723b6c7e8288cb5f6ceba64164cb1394cfc78b0b3f89d4f04",
+              "variants": "aec18b1dc84b5ac8c4d09c11d74b93db4fae022934c04fe2d637963b10b85c60",
+              "variants/darwin-arm64": "8826067cc13705bc9fe228c9fec7b1d0c2007d918f4e15efc01973870553694a"
             },
             "icon": "assets/icon.png",
             "main": {
@@ -131,7 +131,7 @@
             "size": 13839
           },
           "urls": [
-            "https://github.com/Monero-Merchant/logos-monero-merchant-module/releases/download/v0.1.0/logos-monero_merchant-module-lib.lgx"
+            "https://github.com/Monero-Merchant/logos-monero-merchant-module/releases/download/v0.2.0/logos-monero_merchant-module-lib.lgx"
           ]
         }
       ]
@@ -140,9 +140,9 @@
       "name": "monero_merchant_ui",
       "versions": [
         {
-          "releasedAt": "2026-11-10T00:37:43Z",
+          "releasedAt": "2026-11-10T11:02:32Z",
           "publisherRef": "monero_merchant_ui-v0.1.0",
-          "url": "https://github.com/Monero-Merchant/logos-monero-merchant-module/releases/download/v0.1.0/logos-monero_merchant_ui-module.lgx",
+          "url": "https://github.com/Monero-Merchant/logos-monero-merchant-module/releases/download/v0.2.0/logos-monero_merchant_ui-module.lgx",
           "size": 3769355,
           "sha256": "ec88d06271ddcfae6f2019662b65e9509f11eb09794fcd4f3f686561c24dd302",
           "rootHash": "96049887d38ac44cfbb46512498e56d2b2693e05453d2319d11adc9f67e174d3",
@@ -179,7 +179,7 @@
             "size": 13839
           },
           "urls": [
-            "https://github.com/Monero-Merchant/logos-monero-merchant-module/releases/download/v0.1.0/logos-monero_merchant_ui-module.lgx"
+            "https://github.com/Monero-Merchant/logos-monero-merchant-module/releases/download/v0.2.0/logos-monero_merchant_ui-module.lgx"
           ]
         }
       ]

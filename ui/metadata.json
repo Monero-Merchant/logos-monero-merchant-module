@@ -1,7 +1,7 @@
 {
   "name": "monero_merchant_ui",
   "display_name": "Monero Merchant",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "ui_qml",
   "interface": "universal",
   "category": "wallet",
@@ -12,7 +12,7 @@
   "dependencies": [
     {
       "name": "monero_merchant",
-      "version": "0.1.0"
+      "version": "0.2.0"
     }
   ],
   "dependency_overrides": {

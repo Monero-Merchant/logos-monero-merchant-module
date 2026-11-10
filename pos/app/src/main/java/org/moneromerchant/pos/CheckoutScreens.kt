@@ -208,9 +208,8 @@ private fun InvoiceScreen(state: CheckoutState, newOrder: () -> Unit) {
                 Text("Received ${XmrInput.display(invoice.received)} XMR", color = Muted)
                 Text("Status: ${invoice.status}${if (invoice.stale) " · last known, reconnecting" else ""}", color = if (invoice.stale) Color(0xFFFFD477) else MaterialTheme.colorScheme.primary, modifier = Modifier.testTag("invoiceStatus"))
             }
-            if (invoice == null || invoice.creationState != "ready") {
-                Button(onClick = newOrder, enabled = !state.busy, modifier = Modifier.testTag("newOrder")) { Text("New order") }
-            }
+            FilledTonalButton(onClick = newOrder, enabled = !state.busy,
+                modifier = Modifier.fillMaxWidth().height(64.dp).testTag("cancelOrder")) { Text("Cancel") }
         }
         if (state.error.isNotEmpty()) ErrorText(state.error)
         if (invoice?.review == true && !invoice.accepted) ErrorText("Merchant review required after a payment record changed.")

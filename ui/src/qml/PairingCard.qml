@@ -36,6 +36,7 @@ Panel {
     GridLayout {
         columns: root.width < 740 ? 1 : 2; columnSpacing: 24; rowSpacing: 18; Layout.fillWidth: true
         ColumnLayout {
+            id: invitationColumn
             Layout.fillWidth: true; Layout.preferredWidth: 500; Layout.alignment: Qt.AlignTop; spacing: 10
             Text { text: "1 · Generate an invitation"; color: MerchantStyle.MerchantTheme.ink; font.family: MerchantStyle.MerchantTheme.uiFont; font.pixelSize: 14 }
             Text { text: "Pair securely over Logos Delivery. The terminal can use another Wi-Fi network or mobile data."; color: MerchantStyle.MerchantTheme.secondary; font.family: MerchantStyle.MerchantTheme.uiFont; font.pixelSize: 12; Layout.fillWidth: true; wrapMode: Text.WordWrap }
@@ -44,7 +45,7 @@ Panel {
                 id: qrBox; objectName: "posPairingQr"
                 visible: pairing.qr !== null && pairing.remaining > 0
                 readonly property int quiet: 4
-                readonly property int cell: Math.max(1, Math.min(4, Math.floor(Math.max(100, root.width - 80) / ((pairing.qr ? pairing.qr.size : 21) + 8))))
+                readonly property int cell: Math.max(1, Math.min(4, Math.floor(Math.max(100, Math.min(320, invitationColumn.width)) / ((pairing.qr ? pairing.qr.size : 21) + 8))))
                 Layout.preferredWidth: pairing.qr ? (pairing.qr.size + quiet * 2) * cell : 0
                 Layout.preferredHeight: Layout.preferredWidth
                 color: "white"

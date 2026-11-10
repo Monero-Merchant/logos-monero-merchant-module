@@ -86,7 +86,7 @@ fun MerchantApp(model: ConnectionViewModel = viewModel()) {
                 }
                 CheckoutApp(checkout, connection.online, connection.merchant!!.name, connection.detail,
                     manuallyDisconnected = connection.manuallyDisconnected, connectionBusy = connection.busy,
-                    disconnect = model::disconnect, reconnect = model::reconnect) { PairingScreen(model, connection) }
+                    disconnect = model::disconnect, reconnect = model::reconnect) { PairingScreen(model, connection, Modifier) }
             }
         }
     }
@@ -129,7 +129,7 @@ fun CheckoutApp(model: CheckoutViewModel, online: Boolean, merchant: String, con
                 }
             }
         }
-        if (!online) Text(connectionDetail, color = Color(0xFFFFD477), modifier = Modifier.padding(horizontal = 24.dp), fontSize = 12.sp)
+        if (!online && screen != "settings") Text(connectionDetail, color = Color(0xFFFFD477), modifier = Modifier.padding(horizontal = 24.dp), fontSize = 12.sp)
         Box(Modifier.weight(1f).fillMaxWidth()) {
             when (screen) {
                 "settings" -> settings()

@@ -30,7 +30,12 @@ import java.text.DateFormat
 import java.util.Date
 
 @Composable
-fun PairingScreen(model: ConnectionViewModel, state: ConnectionUiState) {
+fun PairingScreen(model: ConnectionViewModel, state: ConnectionUiState,
+    modifier: Modifier = Modifier.safeDrawingPadding()) {
+    if (state.merchant != null) {
+        TerminalSettingsScreen(state, model::reconnect, model::disconnect, model::forget, modifier)
+        return
+    }
     // Invitations contain a secret: deliberately keep them out of saved instance state.
     var invitation by remember { mutableStateOf("") }
     var name by rememberSaveable { mutableStateOf("Counter 1") }
@@ -39,8 +44,8 @@ fun PairingScreen(model: ConnectionViewModel, state: ConnectionUiState) {
         result.contents?.let { invitation = it }
     }
     PosTheme {
-        Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-            Column(Modifier.safeDrawingPadding().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+        Surface(Modifier.fillMaxSize().then(modifier), color = MaterialTheme.colorScheme.background) {
+            Column(Modifier.verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
                 Spacer(Modifier.height(12.dp))
                 Card(shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                     Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -56,18 +61,12 @@ fun PairingScreen(model: ConnectionViewModel, state: ConnectionUiState) {
                         state.lastChecked?.let { Text("Last reply ${DateFormat.getTimeInstance().format(Date(it))}", style = MaterialTheme.typography.labelSmall) }
                     }
                 }
-                if (state.merchant == null) {
-                    OutlinedTextField(name, { name = it.take(80) }, label = { Text("Terminal name") }, singleLine = true, modifier = Modifier.fillMaxWidth(), enabled = !state.busy)
-                    OutlinedButton(onClick = {
-                        scanner.launch(ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE).setPrompt("Scan merchant pairing invitation").setBeepEnabled(false).setOrientationLocked(false))
-                    }, modifier = Modifier.fillMaxWidth(), enabled = !state.busy) { Text("Scan pairing QR") }
-                    OutlinedTextField(invitation, { invitation = it.take(8192) }, label = { Text("Or paste pairing invitation") }, minLines = 3, maxLines = 5, modifier = Modifier.fillMaxWidth(), enabled = !state.busy)
-                    Button(onClick = { model.pair(invitation, name); invitation = "" }, enabled = !state.busy && invitation.isNotBlank(), modifier = Modifier.fillMaxWidth().height(56.dp)) { Text("Pair with merchant") }
-                } else {
-                    Button(onClick = model::reconnect, enabled = !state.busy, modifier = Modifier.fillMaxWidth().height(56.dp)) { Text("Check status") }
-                    OutlinedButton(onClick = model::disconnect, modifier = Modifier.fillMaxWidth(), enabled = !state.busy) { Text("Disconnect") }
-                    TextButton(onClick = { confirmForget = true }, enabled = !state.busy, modifier = Modifier.fillMaxWidth()) { Text("Forget pairing", color = Color(0xFFFF7777)) }
-                }
+                OutlinedTextField(name, { name = it.take(80) }, label = { Text("Terminal name") }, singleLine = true, modifier = Modifier.fillMaxWidth(), enabled = !state.busy)
+                OutlinedButton(onClick = {
+                    scanner.launch(ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE).setPrompt("Scan merchant pairing invitation").setBeepEnabled(false).setOrientationLocked(false))
+                }, modifier = Modifier.fillMaxWidth(), enabled = !state.busy) { Text("Scan pairing QR") }
+                OutlinedTextField(invitation, { invitation = it.take(8192) }, label = { Text("Or paste pairing invitation") }, minLines = 3, maxLines = 5, modifier = Modifier.fillMaxWidth(), enabled = !state.busy)
+                Button(onClick = { model.pair(invitation, name); invitation = "" }, enabled = !state.busy && invitation.isNotBlank(), modifier = Modifier.fillMaxWidth().height(56.dp)) { Text("Pair with merchant") }
                 // Recovery remains available if the Keystore key was invalidated.
                 if (state.phase == "Storage unavailable") TextButton(onClick = { confirmForget = true }) { Text("Forget terminal identity") }
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)

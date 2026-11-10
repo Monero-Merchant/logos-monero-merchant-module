@@ -10,6 +10,9 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -118,7 +121,7 @@ fun CheckoutApp(model: CheckoutViewModel, online: Boolean, merchant: String, con
         Box(Modifier.weight(1f).fillMaxWidth()) {
             when (screen) {
                 "settings" -> settings()
-                "transactions" -> TransactionsScreen(state, model::page)
+                "transactions" -> TransactionsScreen(state, model::loadMoreInvoices)
                 else -> if (state.order == null) AmountScreen(state, online, model::key, model::create)
                         else InvoiceScreen(state, model::newOrder)
             }
@@ -228,12 +231,24 @@ private fun PaymentQr(uri: String) {
     image?.let { Image(it, contentDescription = "Monero payment QR", modifier = Modifier.fillMaxWidth().aspectRatio(1f).testTag("paymentQr")) }
 }
 @Composable
-private fun TransactionsScreen(state: CheckoutState, page: (Int) -> Unit) {
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Text("Invoices", style = MaterialTheme.typography.titleLarge)
-        if (state.historyError.isNotEmpty()) ErrorText(state.historyError)
-        if (state.invoices.isEmpty()) Text("No invoices on this page.", color = Muted)
-        state.invoices.forEach { invoice ->
+private fun TransactionsScreen(state: CheckoutState, loadMore: () -> Unit) {
+    val listState = rememberLazyListState()
+    val nearEnd by remember {
+        derivedStateOf {
+            val layout = listState.layoutInfo
+            (layout.visibleItemsInfo.lastOrNull()?.index ?: -1) >= layout.totalItemsCount - 3
+        }
+    }
+    LaunchedEffect(nearEnd, state.next, state.historyLoading, state.busy, state.historyError) {
+        if (nearEnd && state.next != null && !state.historyLoading && !state.busy && state.historyError.isEmpty()) loadMore()
+    }
+    LazyColumn(Modifier.fillMaxSize().testTag("invoiceList"), state = listState,
+        contentPadding = PaddingValues(24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        item(key = "heading") { Text("Invoices", style = MaterialTheme.typography.titleLarge) }
+        if (state.invoices.isEmpty() && state.historyError.isEmpty()) {
+            item(key = "empty") { Text("No invoices yet.", color = Muted) }
+        }
+        items(state.invoices, key = { it.id }) { invoice ->
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text("${XmrInput.display(invoice.amount)} XMR", fontSize = 21.sp)
@@ -244,9 +259,18 @@ private fun TransactionsScreen(state: CheckoutState, page: (Int) -> Unit) {
                 }
             }
         }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            TextButton(onClick = { page((state.offset - 5).coerceAtLeast(0)) }, enabled = state.offset > 0 && !state.busy) { Text("Previous") }
-            TextButton(onClick = { state.next?.let(page) }, enabled = state.next != null && !state.busy) { Text("Next") }
+        if (state.historyLoading) {
+            item(key = "loading") {
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+            }
+        }
+        if (state.historyError.isNotEmpty()) {
+            item(key = "error") {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ErrorText(state.historyError)
+                    if (state.next != null) TextButton(onClick = loadMore, enabled = !state.historyLoading && !state.busy) { Text("Retry") }
+                }
+            }
         }
     }
 }

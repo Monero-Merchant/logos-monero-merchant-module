@@ -13,7 +13,7 @@ import java.util.UUID
 data class CheckoutState(
     val input: String = "0", val order: OrderIntent? = null, val invoice: PosInvoice? = null,
     val invoices: List<PosInvoice> = emptyList(), val offset: Int = 0, val next: Int? = null,
-    val busy: Boolean = false, val initialized: Boolean = false, val error: String = "", val historyError: String = "",
+    val historyLoading: Boolean = false, val busy: Boolean = false, val initialized: Boolean = false, val error: String = "", val historyError: String = "",
 )
 class CheckoutViewModel(private val gateway: CheckoutGateway) : ViewModel() {
     private val mutable = MutableStateFlow(CheckoutState())
@@ -54,7 +54,7 @@ class CheckoutViewModel(private val gateway: CheckoutGateway) : ViewModel() {
         }
     }
     suspend fun refresh() {
-        if (!mutable.value.initialized || mutable.value.busy || !operations.tryLock()) return
+        if (!mutable.value.initialized || mutable.value.busy || mutable.value.historyLoading || !operations.tryLock()) return
         try {
             val order = mutable.value.order
             if (order != null) {
@@ -67,17 +67,44 @@ class CheckoutViewModel(private val gateway: CheckoutGateway) : ViewModel() {
                 catch (e: Exception) { mutable.value = mutable.value.copy(invoice = mutable.value.invoice?.copy(stale = true), error = e.message ?: "Status unavailable") }
             }
             try {
-                val page = gateway.getInvoices(mutable.value.offset)
-                mutable.value = mutable.value.copy(invoices = page.invoices.map { it.copy(stale = it.stale || !connected) }, next = page.next, historyError = "")
+                // Refresh the loaded range together so polling never replaces
+                // the scrollable history with just one five-invoice page.
+                val lastOffset = mutable.value.offset
+                val lastInvoiceId = mutable.value.invoices.lastOrNull()?.id
+                val invoices = mutableListOf<PosInvoice>()
+                var offset = 0
+                var page: InvoicePage
+                while (true) {
+                    page = gateway.getInvoices(offset)
+                    invoices += page.invoices
+                    val next = page.next
+                    if (next == null || next <= offset || (offset >= lastOffset && (lastInvoiceId == null || invoices.any { it.id == lastInvoiceId }))) break
+                    offset = next
+                }
+                mutable.value = mutable.value.copy(
+                    invoices = invoices.distinctBy { it.id }.map { it.copy(stale = it.stale || !connected) },
+                    offset = offset, next = page.next?.takeIf { it > offset }, historyError = "",
+                )
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) { mutable.value = mutable.value.copy(invoices = mutable.value.invoices.map { it.copy(stale = true) }, historyError = e.message ?: "Transactions unavailable") }
         } finally { operations.unlock() }
     }
-    fun page(offset: Int) {
-        if (mutable.value.busy || offset < 0) return
+    fun loadMoreInvoices() {
+        if (mutable.value.busy || mutable.value.historyLoading || mutable.value.next == null) return
+        mutable.value = mutable.value.copy(historyLoading = true, historyError = "")
         viewModelScope.launch {
-            operations.withLock { mutable.value = mutable.value.copy(offset = offset, invoices = emptyList(), next = null) }
-            refresh()
+            operations.withLock {
+                try {
+                    val offset = mutable.value.next ?: return@withLock
+                    val page = gateway.getInvoices(offset)
+                    mutable.value = mutable.value.copy(
+                        invoices = (mutable.value.invoices + page.invoices.map { it.copy(stale = it.stale || !connected) }).distinctBy { it.id },
+                        offset = offset, next = page.next?.takeIf { it > offset }, historyError = "",
+                    )
+                } catch (e: CancellationException) { throw e }
+                catch (e: Exception) { mutable.value = mutable.value.copy(historyError = e.message ?: "Could not load more invoices") }
+                finally { mutable.value = mutable.value.copy(historyLoading = false) }
+            }
         }
     }
     fun newOrder() {

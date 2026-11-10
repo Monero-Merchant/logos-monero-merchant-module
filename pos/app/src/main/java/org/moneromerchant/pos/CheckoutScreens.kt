@@ -27,7 +27,10 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
@@ -100,7 +103,16 @@ fun CheckoutApp(model: CheckoutViewModel, online: Boolean, merchant: String, con
     Column(Modifier.fillMaxSize().safeDrawingPadding()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text(if (screen == "sale") merchant else if (screen == "transactions") "Transactions" else "Settings", style = MaterialTheme.typography.titleMedium)
+                if (screen == "sale") {
+                    Text(buildAnnotatedString {
+                        append(merchant)
+                        withStyle(SpanStyle(fontSize = MaterialTheme.typography.labelSmall.fontSize, color = Muted)) {
+                            append(" v${BuildConfig.VERSION_NAME}")
+                        }
+                    }, style = MaterialTheme.typography.titleMedium)
+                } else {
+                    Text(if (screen == "transactions") "Transactions" else "Settings", style = MaterialTheme.typography.titleMedium)
+                }
             }
             Box {
                 FilledIconButton(onClick = { menu = true }, modifier = Modifier.testTag("settingsMenu"),

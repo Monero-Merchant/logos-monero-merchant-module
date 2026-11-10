@@ -12,11 +12,14 @@ android {
         minSdk = 28
         targetSdk = 36
         versionCode = 5
-        versionName = "0.3.1"
+        versionName = "0.2.0"
         ndk { abiFilters += providers.gradleProperty("pos.abis").getOrElse("arm64-v8a,x86_64").split(",") }
         externalNativeBuild { cmake { arguments += "-DANDROID_STL=c++_shared" } }
     }
-    buildFeatures { compose = true }
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17

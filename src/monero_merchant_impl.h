@@ -65,6 +65,8 @@ protected:
 
 private:
     std::recursive_mutex stateMutex_;
+    // Never wait on this gate: a wallet IPC call can re-enter the main thread.
+    std::mutex invoiceOperationMutex_;
     std::shared_ptr<merchant::pos::Delivery> pos_;
     std::string posError_;
     std::string createInvoiceForWallet(const std::string& requestId, const std::string& title,
@@ -73,6 +75,7 @@ private:
     std::function<void()> cancelSubscriptions_;
     std::shared_ptr<merchant::InvoiceStore> invoices_;
     std::string invoiceStorageError_;
-    std::string finishInvoiceAddress(const std::string& id, bool allocate);
+    std::string finishInvoiceAddress(const std::shared_ptr<merchant::InvoiceStore>& store,
+                                     const std::string& id, bool allocate);
     void publishInvoices();
 };

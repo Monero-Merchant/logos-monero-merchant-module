@@ -85,9 +85,10 @@ void validateInvoiceAddress(const nlohmann::json& address, const nlohmann::json&
 
 std::string MoneroMerchantImpl::getWalletStatus()
 {
-    std::lock_guard<std::recursive_mutex> lock(stateMutex_);
+    // Wallet IPC marshals onto the main thread. Holding stateMutex_ here
+    // deadlocks if that thread handles a status/reconciliation request meanwhile.
     logos::CallError callError;
-    const auto reply = modules().monero_wallet_backend.wallet_status(&callError);
+    const auto reply = modules().monero_wallet_backend.wallet_status(&callError, 5000);
     return walletReply(reply, callError);
 }
 
@@ -274,8 +275,15 @@ std::string MoneroMerchantImpl::createInvoiceForWallet(const std::string& reques
                                                        const std::string& amountXmr,
                                                        const std::string& expectedWallet)
 {
-    std::lock_guard<std::recursive_mutex> lock(stateMutex_);
-    if (!invoices_)
+    std::unique_lock<std::mutex> operation(invoiceOperationMutex_, std::try_to_lock);
+    if (!operation.owns_lock())
+        return error("invoice_busy", "Another invoice operation is in progress. Retry the same order.");
+    std::shared_ptr<merchant::InvoiceStore> store;
+    {
+        std::lock_guard<std::recursive_mutex> lock(stateMutex_);
+        store = invoices_;
+    }
+    if (!store)
         return getInvoices();
     std::string amount;
     try
@@ -288,7 +296,11 @@ std::string MoneroMerchantImpl::createInvoiceForWallet(const std::string& reques
     }
     try
     {
-        const auto existing = invoices_->find(requestId);
+        nlohmann::json existing;
+        {
+            std::lock_guard<std::recursive_mutex> lock(stateMutex_);
+            existing = store->find(requestId);
+        }
         if (!existing.is_null())
         {
             if (!expectedWallet.empty() && existing["wallet_id"] != expectedWallet)
@@ -297,7 +309,7 @@ std::string MoneroMerchantImpl::createInvoiceForWallet(const std::string& reques
                 return error("request_conflict", "This request ID already belongs to a different invoice.");
             if (existing["creation_state"] == "ready")
                 return invoiceReply(existing, true);
-            return finishInvoiceAddress(requestId, !existing["allocation_attempted"].get<bool>());
+            return finishInvoiceAddress(store, requestId, !existing["allocation_attempted"].get<bool>());
         }
         const auto raw = getWalletStatus();
         const auto status = nlohmann::json::parse(raw);
@@ -316,8 +328,11 @@ std::string MoneroMerchantImpl::createInvoiceForWallet(const std::string& reques
             if (!status.value("connected", false) || !status.value("synchronized", false))
                 return error("wallet_unavailable", "Wait for a connected, synchronized merchant wallet.");
         }
-        (void)invoices_->reserve(requestId, title, amount, status);
-        return finishInvoiceAddress(requestId, true);
+        {
+            std::lock_guard<std::recursive_mutex> lock(stateMutex_);
+            (void)store->reserve(requestId, title, amount, status);
+        }
+        return finishInvoiceAddress(store, requestId, true);
     }
     catch (const merchant::InvoiceError& e)
     {
@@ -331,19 +346,30 @@ std::string MoneroMerchantImpl::createInvoiceForWallet(const std::string& reques
 
 std::string MoneroMerchantImpl::recoverInvoice(const std::string& invoiceId)
 {
-    std::lock_guard<std::recursive_mutex> lock(stateMutex_);
-    if (!invoices_)
+    std::unique_lock<std::mutex> operation(invoiceOperationMutex_, std::try_to_lock);
+    if (!operation.owns_lock())
+        return error("invoice_busy", "Another invoice operation is in progress. Retry this invoice.");
+    std::shared_ptr<merchant::InvoiceStore> store;
+    {
+        std::lock_guard<std::recursive_mutex> lock(stateMutex_);
+        store = invoices_;
+    }
+    if (!store)
         return getInvoices();
-    return finishInvoiceAddress(invoiceId, false);
+    return finishInvoiceAddress(store, invoiceId, false);
 }
 
-std::string MoneroMerchantImpl::finishInvoiceAddress(const std::string& id, bool allocate)
+std::string MoneroMerchantImpl::finishInvoiceAddress(const std::shared_ptr<merchant::InvoiceStore>& store,
+                                                    const std::string& id, bool allocate)
 {
-    std::lock_guard<std::recursive_mutex> lock(stateMutex_);
     using Json = nlohmann::json;
     try
     {
-        auto invoice = invoices_->find(id);
+        Json invoice;
+        {
+            std::lock_guard<std::recursive_mutex> lock(stateMutex_);
+            invoice = store->find(id);
+        }
         if (invoice.is_null())
             return error("not_found", "Invoice does not exist.");
         if (invoice["creation_state"] == "ready")
@@ -385,7 +411,10 @@ std::string MoneroMerchantImpl::finishInvoiceAddress(const std::string& id, bool
             (void)status();
             // Persist intent BEFORE the mutation. A restart can only reconcile
             // this request by its label; it must never blindly create again.
-            invoices_->markAttempted(id);
+            {
+                std::lock_guard<std::recursive_mutex> lock(stateMutex_);
+                store->markAttempted(id);
+            }
             logos::CallError callError;
             created =
                 Json::parse(walletReply(wallet->create_subaddress(0, label, &callError, 10000), callError));
@@ -401,17 +430,24 @@ std::string MoneroMerchantImpl::finishInvoiceAddress(const std::string& id, bool
                 "No unique receiving address was found. Check the original wallet and recover this invoice; "
                 "allocation is not retried automatically.");
         validateInvoiceAddress(found, invoice, created);
-        invoices_->bind(id, found["index"].get<uint32_t>(), found["address"]);
+        {
+            std::lock_guard<std::recursive_mutex> lock(stateMutex_);
+            store->bind(id, found["index"].get<uint32_t>(), found["address"]);
+            invoice = store->find(id);
+        }
         publishInvoices();
         if (incoming_)
             incoming_->refresh();
-        return invoiceReply(invoices_->find(id));
+        return invoiceReply(invoice);
     }
     catch (const std::exception& e)
     {
         try
         {
-            invoices_->recoveryRequired(id, e.what());
+            {
+                std::lock_guard<std::recursive_mutex> lock(stateMutex_);
+                store->recoveryRequired(id, e.what());
+            }
             publishInvoices();
         }
         catch (...)

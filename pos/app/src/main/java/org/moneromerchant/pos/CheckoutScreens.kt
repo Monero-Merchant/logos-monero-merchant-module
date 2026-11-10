@@ -122,29 +122,39 @@ fun CheckoutApp(model: CheckoutViewModel, online: Boolean, merchant: String, con
 }
 @Composable
 private fun AmountScreen(state: CheckoutState, online: Boolean, key: (String) -> Unit, create: () -> Unit) {
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Spacer(Modifier.height(20.dp))
-        Surface(color = Color(0xFF425665), shape = RoundedCornerShape(20.dp), modifier = Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(24.dp)) {
-                Text("XMR", color = Accent, fontSize = 16.sp)
-                Text(state.input, fontSize = 34.sp, fontFamily = FontFamily.Monospace, modifier = Modifier.testTag("amount"))
+    BoxWithConstraints(Modifier.fillMaxSize().padding(24.dp)) {
+        // Fill tall screens, but let the controls scroll on compact displays.
+        val viewportHeight = maxHeight
+        Column(
+            Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).heightIn(min = viewportHeight),
+            verticalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Surface(color = Color(0xFF425665), shape = RoundedCornerShape(20.dp), modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(24.dp)) {
+                        Text("XMR", color = Accent, fontSize = 16.sp)
+                        Text(state.input, fontSize = 34.sp, fontFamily = FontFamily.Monospace, modifier = Modifier.testTag("amount"))
+                    }
+                }
+                if (state.error.isNotEmpty()) ErrorText(state.error)
+                Spacer(Modifier.height(10.dp))
             }
-        }
-        if (state.error.isNotEmpty()) ErrorText(state.error)
-        for (row in listOf(listOf("1", "2", "3"), listOf("4", "5", "6"), listOf("7", "8", "9"))) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                row.forEach { digit -> Key(digit, Modifier.weight(1f), !state.busy) { key(digit) } }
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                for (row in listOf(listOf("1", "2", "3"), listOf("4", "5", "6"), listOf("7", "8", "9"))) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        row.forEach { digit -> Key(digit, Modifier.weight(1f), !state.busy) { key(digit) } }
+                    }
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Key("0", Modifier.weight(2f), !state.busy) { key("0") }
+                    Key(".", Modifier.weight(1f), !state.busy) { key(".") }
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Button(onClick = { key("clear") }, modifier = Modifier.weight(1f).height(64.dp).testTag("clearAmount"), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF5555), contentColor = Color.Black)) { Text("Clear") }
+                    Button(onClick = { key("delete") }, modifier = Modifier.weight(1f).height(64.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF2FF88), contentColor = Color.Black)) { Text("Delete") }
+                    Button(onClick = create, enabled = online && state.initialized && !state.busy && XmrInput.valid(state.input), modifier = Modifier.weight(1f).height(64.dp).testTag("createInvoice"), colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Color.Black)) { Text("Charge") }
+                }
             }
-        }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            Key("0", Modifier.weight(2f), !state.busy) { key("0") }
-            Key(".", Modifier.weight(1f), !state.busy) { key(".") }
-        }
-        HorizontalDivider(color = Color(0xFF474A58))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            Button(onClick = { key("clear") }, modifier = Modifier.weight(1f).height(64.dp).testTag("clearAmount"), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF5555), contentColor = Color.Black)) { Text("Clear") }
-            Button(onClick = { key("delete") }, modifier = Modifier.weight(1f).height(64.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF2FF88), contentColor = Color.Black)) { Text("Delete") }
-            Button(onClick = create, enabled = online && state.initialized && !state.busy && XmrInput.valid(state.input), modifier = Modifier.weight(1f).height(64.dp).testTag("createInvoice"), colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Color.Black)) { Text("Charge") }
         }
     }
 }
@@ -190,7 +200,7 @@ private fun PaymentQr(uri: String) {
             Bitmap.createBitmap(pixels, 512, 512, Bitmap.Config.ARGB_8888).asImageBitmap()
         }.getOrNull() }
     }
-    image?.let { Image(it, contentDescription = "Monero payment QR", modifier = Modifier.sizeIn(maxWidth = 300.dp, maxHeight = 300.dp).fillMaxWidth().aspectRatio(1f).testTag("paymentQr")) }
+    image?.let { Image(it, contentDescription = "Monero payment QR", modifier = Modifier.fillMaxWidth().aspectRatio(1f).testTag("paymentQr")) }
 }
 @Composable
 private fun TransactionsScreen(state: CheckoutState, page: (Int) -> Unit) {

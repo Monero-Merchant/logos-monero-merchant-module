@@ -8,7 +8,6 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -24,6 +23,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -101,7 +101,13 @@ fun CheckoutApp(model: CheckoutViewModel, online: Boolean, merchant: String, con
                 Text(if (screen == "sale") merchant else if (screen == "transactions") "Transactions" else "Settings", style = MaterialTheme.typography.titleMedium)
             }
             Box {
-                TextButton(onClick = { menu = true }, modifier = Modifier.testTag("settingsMenu")) { Text("Menu") }
+                FilledIconButton(onClick = { menu = true }, modifier = Modifier.testTag("settingsMenu"),
+                    colors = IconButtonDefaults.filledIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                    )) {
+                    Icon(painterResource(R.drawable.settings_24px), contentDescription = "Open menu", modifier = Modifier.size(20.dp))
+                }
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                     DropdownMenuItem(text = { Text("Checkout") }, onClick = { menu = false; screen = "sale" })
                     DropdownMenuItem(text = { Text("Transactions") }, onClick = { menu = false; screen = "transactions" })
@@ -150,9 +156,9 @@ private fun AmountScreen(state: CheckoutState, online: Boolean, key: (String) ->
                     Key(".", Modifier.weight(1f), !state.busy) { key(".") }
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Button(onClick = { key("clear") }, modifier = Modifier.weight(1f).height(64.dp).testTag("clearAmount"), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF5555), contentColor = Color.Black)) { Text("Clear") }
-                    Button(onClick = { key("delete") }, modifier = Modifier.weight(1f).height(64.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF2FF88), contentColor = Color.Black)) { Text("Delete") }
-                    Button(onClick = create, enabled = online && state.initialized && !state.busy && XmrInput.valid(state.input), modifier = Modifier.weight(1f).height(64.dp).testTag("createInvoice"), colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Color.Black)) { Text("Charge") }
+                    CheckoutControl(R.drawable.close_24px, "Clear", Modifier.weight(1f).testTag("clearAmount"), !state.busy, Color.White, Color(0xFF20212B)) { key("clear") }
+                    CheckoutControl(R.drawable.arrow_back_24px, "Delete", Modifier.weight(1f), !state.busy, MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.colorScheme.onSecondaryContainer) { key("delete") }
+                    CheckoutControl(R.drawable.check_24px, "Charge", Modifier.weight(1f).testTag("createInvoice"), online && state.initialized && !state.busy && XmrInput.valid(state.input), Accent, MaterialTheme.colorScheme.onPrimary, create)
                 }
             }
         }
@@ -160,8 +166,23 @@ private fun AmountScreen(state: CheckoutState, online: Boolean, key: (String) ->
 }
 @Composable
 private fun RowScope.Key(label: String, modifier: Modifier, enabled: Boolean, action: () -> Unit) {
-    OutlinedButton(onClick = action, enabled = enabled, modifier = modifier.height(64.dp).testTag("key$label"), shape = RoundedCornerShape(24.dp), border = BorderStroke(1.5.dp, Color(0xFF707BA8)), colors = ButtonDefaults.outlinedButtonColors(contentColor = Accent, containerColor = Color(0xFF30323F))) { Text(label, fontSize = 24.sp) }
+    Surface(onClick = action, enabled = enabled, modifier = modifier.height(64.dp).testTag("key$label"),
+        shape = MaterialTheme.shapes.medium,
+        contentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = if (enabled) 1f else 0.38f)) {
+        Box(contentAlignment = Alignment.Center) {
+            Text(label, style = MaterialTheme.typography.titleLarge)
+        }
+    }
 }
+@Composable
+private fun CheckoutControl(icon: Int, label: String, modifier: Modifier, enabled: Boolean,
+    containerColor: Color, contentColor: Color, action: () -> Unit) {
+    FilledTonalButton(onClick = action, enabled = enabled, modifier = modifier.height(64.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = containerColor, contentColor = contentColor)) {
+        Icon(painterResource(icon), contentDescription = label, modifier = Modifier.size(28.dp))
+    }
+}
+
 @Composable
 private fun InvoiceScreen(state: CheckoutState, newOrder: () -> Unit) {
     val invoice = state.invoice

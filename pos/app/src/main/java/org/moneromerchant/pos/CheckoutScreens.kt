@@ -51,9 +51,8 @@ class MainActivity : ComponentActivity() {
         setContent { MerchantApp() }
     }
 }
-private val Accent = Color(0xFF8DE2EB)
 private val Green = Color(0xFF45F879)
-private val Muted = Color(0xFFB8B9C4)
+private val Muted = Color.White.copy(alpha = 0.4f)
 @Composable
 fun MerchantApp(model: ConnectionViewModel = viewModel()) {
     val connection by model.state.collectAsStateWithLifecycle()
@@ -67,7 +66,7 @@ fun MerchantApp(model: ConnectionViewModel = viewModel()) {
         if (lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) model.setForeground(true)
         onDispose { lifecycle.removeObserver(observer) }
     }
-    MaterialTheme(colorScheme = darkColorScheme(primary = Accent, onPrimary = Color(0xFF20212B), background = Color(0xFF282A36), surface = Color(0xFF20212B), onSurface = Color(0xFFF4F4F6))) {
+    PosTheme {
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             if (!connection.approved || connection.merchant == null) PairingScreen(model, connection)
             else {
@@ -136,10 +135,10 @@ private fun AmountScreen(state: CheckoutState, online: Boolean, key: (String) ->
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Surface(color = Color(0xFF425665), shape = RoundedCornerShape(20.dp), modifier = Modifier.fillMaxWidth()) {
+                Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(24.dp)) {
-                        Text("XMR", color = Accent, fontSize = 16.sp)
-                        Text(state.input, fontSize = 34.sp, fontFamily = FontFamily.Monospace, modifier = Modifier.testTag("amount"))
+                        Text("XMR", color = MaterialTheme.colorScheme.primary, fontSize = 16.sp)
+                        Text(state.input, fontSize = 32.sp, modifier = Modifier.testTag("amount"))
                     }
                 }
                 if (state.error.isNotEmpty()) ErrorText(state.error)
@@ -156,9 +155,9 @@ private fun AmountScreen(state: CheckoutState, online: Boolean, key: (String) ->
                     Key(".", Modifier.weight(1f), !state.busy) { key(".") }
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    CheckoutControl(R.drawable.close_24px, "Clear", Modifier.weight(1f).testTag("clearAmount"), !state.busy, Color.White, Color(0xFF20212B)) { key("clear") }
+                    CheckoutControl(R.drawable.close_24px, "Clear", Modifier.weight(1f).testTag("clearAmount"), !state.busy, Color.White, MaterialTheme.colorScheme.onPrimaryContainer) { key("clear") }
                     CheckoutControl(R.drawable.arrow_back_24px, "Delete", Modifier.weight(1f), !state.busy, MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.colorScheme.onSecondaryContainer) { key("delete") }
-                    CheckoutControl(R.drawable.check_24px, "Charge", Modifier.weight(1f).testTag("createInvoice"), online && state.initialized && !state.busy && XmrInput.valid(state.input), Accent, MaterialTheme.colorScheme.onPrimary, create)
+                    CheckoutControl(R.drawable.check_24px, "Charge", Modifier.weight(1f).testTag("createInvoice"), online && state.initialized && !state.busy && XmrInput.valid(state.input), MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.onPrimary, create)
                 }
             }
         }
@@ -168,6 +167,7 @@ private fun AmountScreen(state: CheckoutState, online: Boolean, key: (String) ->
 private fun RowScope.Key(label: String, modifier: Modifier, enabled: Boolean, action: () -> Unit) {
     Surface(onClick = action, enabled = enabled, modifier = modifier.height(64.dp).testTag("key$label"),
         shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surface,
         contentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = if (enabled) 1f else 0.38f)) {
         Box(contentAlignment = Alignment.Center) {
             Text(label, style = MaterialTheme.typography.titleLarge)
@@ -178,7 +178,12 @@ private fun RowScope.Key(label: String, modifier: Modifier, enabled: Boolean, ac
 private fun CheckoutControl(icon: Int, label: String, modifier: Modifier, enabled: Boolean,
     containerColor: Color, contentColor: Color, action: () -> Unit) {
     FilledTonalButton(onClick = action, enabled = enabled, modifier = modifier.height(64.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = containerColor, contentColor = contentColor)) {
+        colors = ButtonDefaults.buttonColors(
+            containerColor = containerColor,
+            contentColor = contentColor,
+            disabledContainerColor = containerColor,
+            disabledContentColor = contentColor.copy(alpha = 0.38f),
+        )) {
         Icon(painterResource(icon), contentDescription = label, modifier = Modifier.size(28.dp))
     }
 }
@@ -197,11 +202,11 @@ private fun InvoiceScreen(state: CheckoutState, newOrder: () -> Unit) {
         } else {
             Text(if (invoice?.status == "partial") "Partial payment received" else "Waiting for payment", style = MaterialTheme.typography.headlineMedium)
             Text("${XmrInput.display(invoice?.remaining ?: state.order!!.amount)} XMR", fontSize = 30.sp)
-            if (state.busy) CircularProgressIndicator(color = Accent)
+            if (state.busy) CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
             if (invoice != null && invoice.creationState == "ready") {
                 if (!invoice.stale && invoice.paymentUri.isNotBlank() && invoice.status in setOf("pending", "partial")) PaymentQr(invoice.paymentUri)
                 Text("Received ${XmrInput.display(invoice.received)} XMR", color = Muted)
-                Text("Status: ${invoice.status}${if (invoice.stale) " · last known, reconnecting" else ""}", color = if (invoice.stale) Color(0xFFFFD477) else Accent, modifier = Modifier.testTag("invoiceStatus"))
+                Text("Status: ${invoice.status}${if (invoice.stale) " · last known, reconnecting" else ""}", color = if (invoice.stale) Color(0xFFFFD477) else MaterialTheme.colorScheme.primary, modifier = Modifier.testTag("invoiceStatus"))
             }
             if (invoice == null || invoice.creationState != "ready") {
                 Button(onClick = newOrder, enabled = !state.busy, modifier = Modifier.testTag("newOrder")) { Text("New order") }
@@ -233,7 +238,7 @@ private fun TransactionsScreen(state: CheckoutState, page: (Int) -> Unit) {
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text("${XmrInput.display(invoice.amount)} XMR", fontSize = 21.sp)
-                    Text(invoice.status.replaceFirstChar { it.uppercase() } + if (invoice.stale) " · last known" else "", color = if (invoice.accepted) Green else Accent)
+                    Text(invoice.status.replaceFirstChar { it.uppercase() } + if (invoice.stale) " · last known" else "", color = if (invoice.accepted) Green else MaterialTheme.colorScheme.primary)
                     Text("Received ${XmrInput.display(invoice.received)} · remaining ${XmrInput.display(invoice.remaining)} XMR", color = Muted, fontSize = 12.sp)
                     Text("Order ${invoice.orderId.take(8)} · ${DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(invoice.createdAt))}", color = Muted, fontSize = 11.sp)
                     if (invoice.review) ErrorText("Review required")

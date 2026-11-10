@@ -29,7 +29,6 @@ import com.journeyapps.barcodescanner.ScanOptions
 import java.text.DateFormat
 import java.util.Date
 
-private val Cyan = Color(0xFF8DE2EB)
 @Composable
 fun PairingScreen(model: ConnectionViewModel, state: ConnectionUiState) {
     // Invitations contain a secret: deliberately keep them out of saved instance state.
@@ -39,18 +38,15 @@ fun PairingScreen(model: ConnectionViewModel, state: ConnectionUiState) {
     val scanner = rememberLauncherForActivityResult(ScanContract()) { result ->
         result.contents?.let { invitation = it }
     }
-    MaterialTheme(colorScheme = darkColorScheme(
-        primary = Cyan, onPrimary = Color(0xFF20212B), background = Color(0xFF282A36),
-        surface = Color(0xFF20212B), onSurface = Color(0xFFF4F4F6), secondary = Color(0xFFB0B7D9),
-    )) {
+    PosTheme {
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             Column(Modifier.safeDrawingPadding().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
                 Spacer(Modifier.height(12.dp))
-                Card(shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFF20212B))) {
+                Card(shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                     Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text(state.phase, style = MaterialTheme.typography.titleLarge, color = if (state.online) Color(0xFF45F879) else Cyan)
+                        Text(state.phase, style = MaterialTheme.typography.titleLarge, color = if (state.online) Color(0xFF45F879) else MaterialTheme.colorScheme.primary)
                         Text(state.detail)
-                        if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth(), color = Cyan)
+                        if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.primary)
                         state.merchant?.let { merchant ->
                             Text(merchant.name, style = MaterialTheme.typography.titleMedium)
                             Identity("Merchant identity", merchant.peerId)
@@ -74,9 +70,9 @@ fun PairingScreen(model: ConnectionViewModel, state: ConnectionUiState) {
                 }
                 // Recovery remains available if the Keystore key was invalidated.
                 if (state.phase == "Storage unavailable") TextButton(onClick = { confirmForget = true }) { Text("Forget terminal identity") }
-                HorizontalDivider(color = Color(0xFF474A58))
-                Text("MERCHANT CONNECTION", color = Cyan, style = MaterialTheme.typography.labelMedium)
-                Text("Logos Delivery · authenticated HPKE\nEncrypted merchant messages", style = MaterialTheme.typography.bodySmall, color = Color(0xFFB8B9C4))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Text("MERCHANT CONNECTION", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelMedium)
+                Text("Logos Delivery · authenticated HPKE\nEncrypted merchant messages", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f))
             }
             if (confirmForget) AlertDialog(onDismissRequest = { confirmForget = false }, title = { Text("Forget this terminal?") },
                 text = { Text("Deletes the saved merchant and terminal key on this phone. Revoke the old identity on the merchant computer too.") },
@@ -87,6 +83,6 @@ fun PairingScreen(model: ConnectionViewModel, state: ConnectionUiState) {
 }
 @Composable
 private fun Identity(label: String, value: String) {
-    Text(label, color = Color(0xFFB8B9C4), style = MaterialTheme.typography.labelSmall)
+    Text(label, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f), style = MaterialTheme.typography.labelSmall)
     SelectionContainer { Text(value, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall) }
 }

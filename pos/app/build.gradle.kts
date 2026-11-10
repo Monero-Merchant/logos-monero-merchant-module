@@ -11,8 +11,8 @@ android {
         applicationId = "org.moneromerchant.pos.poc"
         minSdk = 28
         targetSdk = 36
-        versionCode = 5
-        versionName = "0.2.0"
+        versionCode = 6
+        versionName = "0.3.0"
         ndk { abiFilters += providers.gradleProperty("pos.abis").getOrElse("arm64-v8a,x86_64").split(",") }
         externalNativeBuild { cmake { arguments += "-DANDROID_STL=c++_shared" } }
     }

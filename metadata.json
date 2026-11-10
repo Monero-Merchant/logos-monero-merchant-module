@@ -1,7 +1,7 @@
 {
   "name": "monero_merchant",
   "display_name": "Monero Merchant POS PoC",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "core",
   "interface": "universal",
   "category": "wallet",

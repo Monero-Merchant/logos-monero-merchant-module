@@ -175,6 +175,14 @@ void destroy(Node* node) {
         // An already-dispatched callback holds its own shared event state.
         logosdelivery_ctx_destroy(node->ctx);
     }
+#ifdef MERCHANT_DELIVERY_DEBUG
+    {
+        std::lock_guard guard(node->events->mutex);
+        DELIVERY_LOG("node queue summary: received=%llu delivered=%llu dropped=%llu remaining=%zu",
+            static_cast<unsigned long long>(node->events->received), static_cast<unsigned long long>(node->events->delivered),
+            static_cast<unsigned long long>(node->events->dropped), node->events->events.size());
+    }
+#endif
     delete node;
     DELIVERY_LOG("node stopped");
 }
@@ -225,7 +233,7 @@ extern "C" JNIEXPORT void JNICALL Java_org_moneromerchant_pos_NativeLib_subscrib
 extern "C" JNIEXPORT void JNICALL Java_org_moneromerchant_pos_NativeLib_send(JNIEnv* env,jobject,jlong handle,jstring message) {
     try { Utf text(env,message); auto node=get(handle); invoke([&](void* data){return logosdelivery_ctx_send(node->ctx,text.data,onReply,data);});
 #ifdef MERCHANT_DELIVERY_DEBUG
-        if (logCount(++node->sends)) DELIVERY_LOG("sends accepted=%llu", static_cast<unsigned long long>(node->sends));
+        if (logCount(++node->sends)) DELIVERY_LOG("sends submitted=%llu", static_cast<unsigned long long>(node->sends));
 #endif
     }
     catch (const std::exception& error){DELIVERY_LOG("send failed"); fail(env,error);}
@@ -241,6 +249,17 @@ extern "C" JNIEXPORT jstring JNICALL Java_org_moneromerchant_pos_NativeLib_recei
 #endif
         return env->NewStringUTF(text.c_str());
     } catch (const std::exception& error){fail(env,error);return nullptr;}
+}
+extern "C" JNIEXPORT void JNICALL Java_org_moneromerchant_pos_NativeLib_logQueueStats(JNIEnv* env,jobject,jlong handle) {
+#ifdef MERCHANT_DELIVERY_DEBUG
+    try {
+        auto events = get(handle)->events;
+        std::lock_guard guard(events->mutex);
+        DELIVERY_LOG("node queue snapshot: received=%llu delivered=%llu dropped=%llu remaining=%zu",
+            static_cast<unsigned long long>(events->received), static_cast<unsigned long long>(events->delivered),
+            static_cast<unsigned long long>(events->dropped), events->events.size());
+    } catch (const std::exception& error) { fail(env,error); }
+#endif
 }
 extern "C" JNIEXPORT void JNICALL Java_org_moneromerchant_pos_NativeLib_close(JNIEnv* env,jobject,jlong handle) {
     try {destroy(reinterpret_cast<Node*>(handle));} catch (const std::exception& error){fail(env,error);}

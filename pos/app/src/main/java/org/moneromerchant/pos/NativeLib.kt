@@ -11,5 +11,7 @@ object NativeLib {
     external fun subscribe(handle: Long, topic: String)
     external fun send(handle: Long, message: String)
     external fun receive(handle: Long, timeoutMs: Int): String?
+    /** Writes a cumulative native queue snapshot in debug builds. */
+    external fun logQueueStats(handle: Long)
     external fun close(handle: Long)
 }

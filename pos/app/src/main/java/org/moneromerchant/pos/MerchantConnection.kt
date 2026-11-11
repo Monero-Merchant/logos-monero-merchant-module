@@ -133,6 +133,11 @@ class MerchantConnection(private val store: SecureStore) : CheckoutGateway {
         val id = UUID.randomUUID().toString()
         val request = JSONObject().put("version", 1).put("request_id", id).put("type", type).put("args", args)
         val key = privateKey()
+        val started = System.nanoTime()
+        var sends = 0
+        var live = 0; var history = 0; var unknownSource = 0
+        var otherTopic = 0; var malformed = 0; var rejected = 0
+        var outcome = "interrupted or failed"
         try {
             val terminal = terminalIdentity()
             val replyTopic = DeliveryCrypto.replyTopic(merchant.peerId,terminal)
@@ -148,22 +153,37 @@ class MerchantConnection(private val store: SecureStore) : CheckoutGateway {
                     val message = JSONObject().put("contentTopic",merchant.topic)
                         .put("payload",Base64.getEncoder().encodeToString(sealed)).put("ephemeral",false)
                     NativeLib.send(handle,message.toString())
+                    if (BuildConfig.DEBUG) sends++
                     nextSend = System.nanoTime()+5_000_000_000L
                 }
                 val event = NativeLib.receive(handle,500) ?: continue
                 val reply = try {
-                    val data = JSONObject(event).optJSONObject("message") ?: continue
-                    if (data.optString("contentTopic") != replyTopic) continue
+                    val parsed = JSONObject(event)
+                    if (BuildConfig.DEBUG) when (parsed.optString("source")) {
+                        "live" -> live++
+                        "history" -> history++
+                        else -> unknownSource++
+                    }
+                    val data = parsed.optJSONObject("message")
+                    if (data == null) { if (BuildConfig.DEBUG) malformed++; continue }
+                    if (data.optString("contentTopic") != replyTopic) { if (BuildConfig.DEBUG) otherTopic++; continue }
                     val raw = Base64.getDecoder().decode(data.getString("payload"))
                     DeliveryCrypto.open(key,DeliveryCrypto.decode(merchant.publicKey),replyTopic,"reply",id,raw)
-                } catch (_: Exception) { continue } // Untrusted/stale network traffic is never a reply.
+                } catch (_: Exception) { if (BuildConfig.DEBUG) rejected++; continue } // Includes malformed, untrusted and stale traffic.
                 require(reply.getInt("version") == 1 && reply.getString("request_id") == id) { "Invalid merchant reply" }
-                diagnostic("authenticated reply received")
+                outcome = "authenticated reply"
                 return reply
             }
-            diagnostic("request timed out waiting for authenticated reply")
+            outcome = "reply timed out"
             error("Basecamp did not reply over Delivery. Check its connection and retry with the saved order.")
-        } finally { key.fill(0) }
+        } finally {
+            key.fill(0)
+            if (BuildConfig.DEBUG) {
+                val elapsedMs = (System.nanoTime() - started) / 1_000_000
+                diagnostic("exchange $outcome: elapsed_ms=$elapsedMs sends=$sends received_live=$live received_history=$history received_source_unknown=$unknownSource other_topic=$otherTopic missing_message=$malformed rejected_or_malformed=$rejected")
+                try { NativeLib.logQueueStats(handle) } catch (_: Exception) { diagnostic("node queue snapshot unavailable") }
+            }
+        }
     }
     suspend fun disconnect() = withContext(Dispatchers.IO) {
         lock.withLock { if (handle != 0L) { val previous = handle; handle = 0; NativeLib.close(previous) } }

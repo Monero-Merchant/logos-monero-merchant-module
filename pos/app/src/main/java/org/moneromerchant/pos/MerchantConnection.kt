@@ -43,14 +43,19 @@ class MerchantConnection(private val store: SecureStore) : CheckoutGateway {
         val key = privateKey()
         return try { DeliveryCrypto.identity(DeliveryCrypto.publicKey(key)) } finally { key.fill(0) }
     }
-    private fun ensureNode() {
+    private suspend fun ensureNode() {
         if (handle != 0L) return
+        currentCoroutineContext().ensureActive()
         val merchant = requireNotNull(endpoint()) { "Pair with Basecamp first" }
         val config = JSONObject().put("mode","Edge").put("preset",merchant.network)
             .put("messagingOverrides",JSONObject().put("anonymityLevel","None").put("nat","none").put("localStoragePath",store.deliveryPath())
                 .put("tcp-port",0).put("discv5-udp-port",0))
         handle = NativeLib.open(config.toString())
-        try { NativeLib.subscribe(handle,DeliveryCrypto.replyTopic(merchant.peerId,terminalIdentity())) }
+        try {
+            currentCoroutineContext().ensureActive()
+            NativeLib.subscribe(handle,DeliveryCrypto.replyTopic(merchant.peerId,terminalIdentity()))
+            currentCoroutineContext().ensureActive()
+        }
         catch (error: Exception) { val old=handle;handle=0;NativeLib.close(old);throw error }
     }
     suspend fun pair(invite: PairingInvite, deviceName: String): Pair<MerchantEndpoint, JSONObject> = withContext(Dispatchers.IO) {
@@ -75,7 +80,7 @@ class MerchantConnection(private val store: SecureStore) : CheckoutGateway {
         lock.withLock { ensureNode(); exchange("GetBackendStatus") }
     }
     suspend fun localPeer(): String = withContext(Dispatchers.IO) { lock.withLock { ensureNode(); terminalIdentity() } }
-    private fun validateScope(scope: Pair<String, String>?) {
+    private suspend fun validateScope(scope: Pair<String, String>?) {
         if (scope == null) return
         check(endpoint()?.peerId == scope.first) { "Merchant pairing changed. Reopen checkout." }
         ensureNode()

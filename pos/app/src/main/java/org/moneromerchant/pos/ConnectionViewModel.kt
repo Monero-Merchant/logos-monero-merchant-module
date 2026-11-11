@@ -154,9 +154,12 @@ class ConnectionViewModel(app: Application) : AndroidViewModel(app) {
         desired = false
         val previous = active
         previous?.cancel()
-        mutable.value = mutable.value.copy(busy = true, online = false, manuallyDisconnected = true, phase = "Disconnected", detail = "Pairing and current order saved. Tap Reconnect to check Monero Merchant in Basecamp.")
+        mutable.value = mutable.value.copy(busy = true, online = false, manuallyDisconnected = true, phase = "Disconnecting", detail = "Stopping the connection. Pairing and current order are saved.")
         active = viewModelScope.launch {
-            try { previous?.join(); connection.disconnect() }
+            try {
+                previous?.join(); connection.disconnect()
+                mutable.value = mutable.value.copy(phase = "Disconnected", detail = "Pairing and current order saved. Tap Reconnect to check Monero Merchant in Basecamp.")
+            }
             catch (e: CancellationException) { throw e }
             catch (e: Exception) { mutable.value = mutable.value.copy(detail = e.message ?: "Connection shutdown failed") }
             finally { mutable.value = mutable.value.copy(busy = false) }

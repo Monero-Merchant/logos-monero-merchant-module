@@ -58,7 +58,7 @@ fun TerminalSettingsScreen(
                     Text(if (state.online) "Check connection" else "Reconnect")
                 }
                 if (!state.manuallyDisconnected) {
-                    FilledTonalButton(onClick = disconnect, enabled = !state.busy,
+                    FilledTonalButton(onClick = disconnect,
                         modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("Disconnect") }
                 }
                 FilledTonalButton(onClick = { confirmForget = true }, enabled = !state.busy,

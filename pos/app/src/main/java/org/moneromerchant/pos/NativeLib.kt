@@ -4,6 +4,10 @@ package org.moneromerchant.pos
 object NativeLib {
     init { System.loadLibrary("merchant_delivery") }
     external fun open(config: String): Long
+    /** Current Delivery node status; does not establish merchant reachability. */
+    external fun connectionStatus(handle: Long): String
+    /** Next raw Delivery status-change JSON, or null after timeout; oldest events may be dropped. */
+    external fun receiveConnectionStatusChange(handle: Long, timeoutMs: Int): String?
     external fun subscribe(handle: Long, topic: String)
     external fun send(handle: Long, message: String)
     external fun receive(handle: Long, timeoutMs: Int): String?

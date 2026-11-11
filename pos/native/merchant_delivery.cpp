@@ -2,6 +2,7 @@
 #include "callback_registry.h"
 #include <liblogosdelivery.h>
 #include <chrono>
+#include <cctype>
 #include <condition_variable>
 #include <deque>
 #include <memory>
@@ -21,6 +22,8 @@ struct Events {
     std::mutex mutex;
     std::condition_variable available;
     std::deque<std::string> events;
+    std::condition_variable statusAvailable;
+    std::deque<std::string> statusEvents;
 #ifdef MERCHANT_DELIVERY_DEBUG
     uint64_t received = 0, dropped = 0, delivered = 0;
 #endif
@@ -30,12 +33,38 @@ struct Node {
     std::shared_ptr<Events> events = std::make_shared<Events>();
     uintptr_t eventTicket = 0;
     uint64_t listener = 0;
+    uint64_t statusListener = 0;
 #ifdef MERCHANT_DELIVERY_DEBUG
     uint64_t sends = 0;
 #endif
 };
 #ifdef MERCHANT_DELIVERY_DEBUG
 bool logCount(uint64_t count) { return count && !(count & (count - 1)); }
+const char* safeStatus(const std::string& status) {
+    if (status == "Connected") return "Connected";
+    if (status == "PartiallyConnected") return "PartiallyConnected";
+    if (status == "Disconnected") return "Disconnected";
+    return "Unknown";
+}
+void debugStatusReply(int error, const char* const* value, const char*, void*) {
+    if (error != RET_OK || !value || !*value) { DELIVERY_LOG("initial connection status unavailable"); return; }
+    try { DELIVERY_LOG("initial connection status: %s", safeStatus(*value)); }
+    catch (...) { /* Diagnostics must not escape the native callback. */ }
+}
+void logStatusEvent(const char* data, size_t size) {
+    // Extract only the known status field; never print arbitrary event contents.
+    const std::string json(data, size);
+    auto pos = json.find("\"connectionStatus\"");
+    if (pos == std::string::npos) { DELIVERY_LOG("connection status change: Unknown"); return; }
+    pos = json.find(':', pos + 18);
+    if (pos == std::string::npos) { DELIVERY_LOG("connection status change: Unknown"); return; }
+    ++pos;
+    while (pos < json.size() && std::isspace(static_cast<unsigned char>(json[pos]))) ++pos;
+    if (pos == json.size() || json[pos++] != '"') { DELIVERY_LOG("connection status change: Unknown"); return; }
+    const auto end = json.find('"', pos);
+    if (end == std::string::npos) { DELIVERY_LOG("connection status change: Unknown"); return; }
+    DELIVERY_LOG("connection status change: %s", safeStatus(json.substr(pos, end - pos)));
+}
 #endif
 struct Reply {
     std::mutex mutex;
@@ -43,6 +72,7 @@ struct Reply {
     bool done = false, abandoned = false;
     int error = 0;
     LogosDeliveryCtx* ctx = nullptr;
+    std::string value;
 };
 using Shared = std::shared_ptr<Reply>;
 template<class F> Shared invoke(F submit) {
@@ -67,6 +97,16 @@ void onReply(int error, const char* const*, const char*, void* data) {
     auto reply = CallbackRegistry<Reply>::instance().take(reinterpret_cast<uintptr_t>(data));
     if (!reply) return;
     std::lock_guard guard(reply->mutex);
+    reply->error = error; reply->done = true; reply->ready.notify_one();
+}
+void onStatusReply(int error, const char* const* value, const char*, void* data) {
+    auto reply = CallbackRegistry<Reply>::instance().take(reinterpret_cast<uintptr_t>(data));
+    if (!reply) return;
+    std::lock_guard guard(reply->mutex);
+    try {
+        if (error == RET_OK && value && *value) reply->value = *value;
+        else if (error == RET_OK) error = -1;
+    } catch (...) { error = -1; }
     reply->error = error; reply->done = true; reply->ready.notify_one();
 }
 void onCreate(int error, LogosDeliveryCtx* ctx, const char*, void* data) {
@@ -101,6 +141,20 @@ void event(int error, const char* data, size_t size, void* opaque) {
 #endif
     } catch (...) { /* Never unwind C++ exceptions through the Nim event loop. */ }
 }
+void statusEvent(int error, const char* data, size_t size, void* opaque) {
+    if (error != RET_OK || !data || size > 4096) return;
+    try {
+        auto events = CallbackRegistry<Events>::instance().get(reinterpret_cast<uintptr_t>(opaque));
+        if (!events) return;
+#ifdef MERCHANT_DELIVERY_DEBUG
+        logStatusEvent(data, size);
+#endif
+        std::lock_guard guard(events->mutex);
+        if (events->statusEvents.size() >= 32) events->statusEvents.pop_front();
+        events->statusEvents.emplace_back(data, size);
+        events->statusAvailable.notify_one();
+    } catch (...) { /* Never unwind through the Delivery event loop. */ }
+}
 struct Utf {
     JNIEnv* env; jstring value; const char* data;
     Utf(JNIEnv* e,jstring v):env(e),value(v),data(e->GetStringUTFChars(v,nullptr)) { if (!data) throw std::runtime_error("Invalid text"); }
@@ -116,6 +170,7 @@ void destroy(Node* node) {
     CallbackRegistry<Events>::instance().take(node->eventTicket);
     if (node->ctx) {
         if (node->listener) logosdelivery_remove_event_listener(node->ctx->ptr,node->listener);
+        if (node->statusListener) logosdelivery_remove_event_listener(node->ctx->ptr,node->statusListener);
         try { invoke([&](void* data){return logosdelivery_ctx_stop_node(node->ctx,onReply,data);}); } catch (...) {}
         // An already-dispatched callback holds its own shared event state.
         logosdelivery_ctx_destroy(node->ctx);
@@ -134,10 +189,33 @@ extern "C" JNIEXPORT jlong JNICALL Java_org_moneromerchant_pos_NativeLib_open(JN
         node->eventTicket = CallbackRegistry<Events>::instance().add(node->events);
         node->listener = logosdelivery_add_event_listener(node->ctx->ptr,"onMessageReceived",event,reinterpret_cast<void*>(node->eventTicket));
         if (!node->listener) throw std::runtime_error("Could not register Delivery listener");
+        node->statusListener = logosdelivery_add_event_listener(node->ctx->ptr,"onConnectionStatusChange",statusEvent,reinterpret_cast<void*>(node->eventTicket));
+        if (!node->statusListener) throw std::runtime_error("Could not register Delivery status listener");
         invoke([&](void* data){return logosdelivery_ctx_start_node(node->ctx,onReply,data);});
         DELIVERY_LOG("node started");
+#ifdef MERCHANT_DELIVERY_DEBUG
+        if (logosdelivery_ctx_get_connection_status(node->ctx,debugStatusReply,nullptr) != RET_OK)
+            DELIVERY_LOG("initial connection status request failed");
+#endif
         return reinterpret_cast<jlong>(node.release());
     } catch (const std::exception& error) { DELIVERY_LOG("node startup failed"); destroy(node.release()); fail(env,error); return 0; }
+}
+extern "C" JNIEXPORT jstring JNICALL Java_org_moneromerchant_pos_NativeLib_connectionStatus(JNIEnv* env,jobject,jlong handle) {
+    try {
+        auto node = get(handle);
+        auto reply = invoke([&](void* data){return logosdelivery_ctx_get_connection_status(node->ctx,onStatusReply,data);});
+        return env->NewStringUTF(reply->value.c_str());
+    } catch (const std::exception& error) { fail(env,error); return nullptr; }
+}
+extern "C" JNIEXPORT jstring JNICALL Java_org_moneromerchant_pos_NativeLib_receiveConnectionStatusChange(JNIEnv* env,jobject,jlong handle,jint timeoutMs) {
+    try {
+        auto events = get(handle)->events;
+        std::unique_lock guard(events->mutex);
+        events->statusAvailable.wait_for(guard,std::chrono::milliseconds(timeoutMs),[&]{return !events->statusEvents.empty();});
+        if (events->statusEvents.empty()) return nullptr;
+        auto text = std::move(events->statusEvents.front()); events->statusEvents.pop_front();
+        return env->NewStringUTF(text.c_str());
+    } catch (const std::exception& error) { fail(env,error); return nullptr; }
 }
 extern "C" JNIEXPORT void JNICALL Java_org_moneromerchant_pos_NativeLib_subscribe(JNIEnv* env,jobject,jlong handle,jstring topic) {
     DELIVERY_LOG("reply subscription starting");

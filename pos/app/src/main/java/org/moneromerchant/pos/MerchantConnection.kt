@@ -7,6 +7,7 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.util.Base64
 import java.util.UUID
+import android.util.Log
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 
@@ -15,6 +16,9 @@ class MerchantConnection(private val store: SecureStore) : CheckoutGateway {
     private val lock = Mutex()
     private var handle = 0L
     private var record: JSONObject? = null
+    private fun diagnostic(message: String) {
+        if (BuildConfig.DEBUG) Log.d("MerchantDelivery", message)
+    }
 
     suspend fun restore(): MerchantEndpoint? = withContext(Dispatchers.IO) {
         lock.withLock {
@@ -154,8 +158,10 @@ class MerchantConnection(private val store: SecureStore) : CheckoutGateway {
                     DeliveryCrypto.open(key,DeliveryCrypto.decode(merchant.publicKey),replyTopic,"reply",id,raw)
                 } catch (_: Exception) { continue } // Untrusted/stale network traffic is never a reply.
                 require(reply.getInt("version") == 1 && reply.getString("request_id") == id) { "Invalid merchant reply" }
+                diagnostic("authenticated reply received")
                 return reply
             }
+            diagnostic("request timed out waiting for authenticated reply")
             error("Basecamp did not reply over Delivery. Check its connection and retry with the saved order.")
         } finally { key.fill(0) }
     }

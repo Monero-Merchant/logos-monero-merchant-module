@@ -17,4 +17,6 @@ set_target_properties(logosdelivery PROPERTIES IMPORTED_LOCATION "${DELIVERY_ROO
 add_library(merchant_delivery SHARED merchant_delivery.cpp)
 target_include_directories(merchant_delivery PRIVATE "${DELIVERY_ROOT}/include")
 target_link_libraries(merchant_delivery PRIVATE tinycbor logosdelivery)
+target_compile_definitions(merchant_delivery PRIVATE $<$<CONFIG:Debug>:MERCHANT_DELIVERY_DEBUG>)
+target_link_libraries(merchant_delivery PRIVATE $<$<CONFIG:Debug>:log>)
 target_link_options(merchant_delivery PRIVATE "-Wl,-z,max-page-size=16384" "-Wl,-z,common-page-size=16384")

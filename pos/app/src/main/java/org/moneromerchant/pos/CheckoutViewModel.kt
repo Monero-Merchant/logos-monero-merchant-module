@@ -53,7 +53,7 @@ class CheckoutViewModel(private val gateway: CheckoutGateway) : ViewModel() {
             }
         }
     }
-    suspend fun refresh() {
+    suspend fun refreshActiveInvoice() {
         if (!mutable.value.initialized || mutable.value.busy || mutable.value.historyLoading || !operations.tryLock()) return
         try {
             val order = mutable.value.order
@@ -66,6 +66,11 @@ class CheckoutViewModel(private val gateway: CheckoutGateway) : ViewModel() {
                 } catch (e: CancellationException) { throw e }
                 catch (e: Exception) { mutable.value = mutable.value.copy(invoice = mutable.value.invoice?.copy(stale = true), error = e.message ?: "Status unavailable") }
             }
+        } finally { operations.unlock() }
+    }
+    suspend fun refreshHistory() {
+        if (!mutable.value.initialized || mutable.value.busy || mutable.value.historyLoading || !operations.tryLock()) return
+        try {
             try {
                 // Refresh the loaded range together so polling never replaces
                 // the scrollable history with just one five-invoice page.

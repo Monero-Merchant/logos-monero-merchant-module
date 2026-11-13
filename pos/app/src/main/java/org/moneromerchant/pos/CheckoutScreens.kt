@@ -46,6 +46,7 @@ import com.google.zxing.EncodeHintType
 import com.google.zxing.qrcode.QRCodeWriter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.DateFormat
 import java.util.Date
@@ -81,7 +82,8 @@ fun MerchantApp(model: ConnectionViewModel = viewModel()) {
                 })
                 LaunchedEffect(checkout, lifecycle) {
                     lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                        while (true) { if (model.state.value.online) checkout.refresh(); delay(5000) }
+                        launch { while (true) { if (model.state.value.online) checkout.refreshActiveInvoice(); delay(2000) } }
+                        launch { while (true) { if (model.state.value.online) checkout.refreshHistory(); delay(15000) } }
                     }
                 }
                 CheckoutApp(checkout, connection.online, connection.merchant!!.name, connection.detail,

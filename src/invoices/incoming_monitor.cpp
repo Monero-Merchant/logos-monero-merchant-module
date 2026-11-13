@@ -34,7 +34,7 @@ public:
     {
         cache_ = {{"ok", true},        {"state", "starting"},  {"stale", false}, {"payments", Json::array()},
                   {"wallet", nullptr}, {"updated_at", nullptr}};
-        timer_.setInterval(10000);
+        timer_.setInterval(2000);
         QObject::connect(&timer_, &QTimer::timeout, this, [this] { request(); });
         timer_.start();
         QTimer::singleShot(0, this, [this] { request(); });

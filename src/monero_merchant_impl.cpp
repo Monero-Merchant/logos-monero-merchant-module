@@ -7,6 +7,9 @@
 #include "pos/pos_delivery.h"
 
 #include <algorithm>
+#include <chrono>
+#include <QDateTime>
+#include <QDebug>
 #include <nlohmann/json.hpp>
 #include <vector>
 
@@ -125,7 +128,10 @@ void MoneroMerchantImpl::onContextReady()
             {
                 try
                 {
+                    const auto started = std::chrono::steady_clock::now();
                     invoices_->reconcile(nlohmann::json::parse(snapshot));
+                    qDebug().noquote() << "MerchantPayment reconcile_done epoch_ms=" << QDateTime::currentMSecsSinceEpoch()
+                        << "elapsed_ms=" << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - started).count();
                     invoiceStorageError_.clear();
                 }
                 catch (const std::exception& e)
@@ -138,22 +144,23 @@ void MoneroMerchantImpl::onContextReady()
         });
 
     const std::weak_ptr<IncomingMonitor> weak = incoming_;
-    const auto changed = [weak](const std::string&)
+    const auto changed = [weak](const char* reason)
     {
-        if (auto monitor = weak.lock())
-            monitor->refresh();
+        return [weak, reason](const std::string&) {
+            if (auto monitor = weak.lock()) monitor->refresh(reason);
+        };
     };
     auto* wallet = &modules().monero_wallet_backend;
     auto handles = std::make_shared<std::vector<logos::SubHandle>>();
-    handles->push_back(wallet->onBalance_changed(changed));
-    handles->push_back(wallet->onSync_progress(changed));
-    handles->push_back(wallet->onWallet_state_changed(changed));
+    handles->push_back(wallet->onBalance_changed(changed("balance_changed")));
+    handles->push_back(wallet->onSync_progress(changed("sync_progress")));
+    handles->push_back(wallet->onWallet_state_changed(changed("wallet_state_changed")));
     wallet->onSubscriptionStatus(
         [weak](logos::SubStatus, std::uint64_t)
         {
             // Reconcile after arming/reconnection; events are not a durable queue.
             if (auto monitor = weak.lock())
-                monitor->refresh();
+                monitor->refresh("subscription_status");
         });
     cancelSubscriptions_ = [wallet, handles]() mutable
     {
@@ -240,7 +247,7 @@ std::string MoneroMerchantImpl::refreshInvoices()
     std::lock_guard<std::recursive_mutex> lock(stateMutex_);
     if (!incoming_)
         return error("not_ready", "Payment monitoring is starting.");
-    incoming_->refresh();
+    incoming_->refresh("explicit_refresh");
     return R"({"ok":true,"scheduled":true})";
 }
 
@@ -437,7 +444,7 @@ std::string MoneroMerchantImpl::finishInvoiceAddress(const std::shared_ptr<merch
         }
         publishInvoices();
         if (incoming_)
-            incoming_->refresh();
+            incoming_->refresh("invoice_created");
         return invoiceReply(invoice);
     }
     catch (const std::exception& e)

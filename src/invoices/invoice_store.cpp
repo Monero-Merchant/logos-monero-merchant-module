@@ -4,6 +4,8 @@
 #include "merchant_amounts.h"
 
 #include <chrono>
+#include <QDateTime>
+#include <QDebug>
 #include <mutex>
 #include <set>
 
@@ -90,7 +92,7 @@ struct InvoiceStore::Impl
 
     void recordReceipt(const std::string& invoiceId, const std::string& wallet, const Json& payment);
     void markMissingReceipts(const std::string& wallet, const std::set<std::string>& seen);
-    void updateInvoice(const std::string& id);
+    std::pair<std::string, std::string> updateInvoice(const std::string& id);
 
     void event(const std::string& id, const char* kind, const Json& details)
     {
@@ -165,7 +167,7 @@ void InvoiceStore::Impl::markMissingReceipts(const std::string& wallet, const st
         }
 }
 
-void InvoiceStore::Impl::updateInvoice(const std::string& id)
+std::pair<std::string, std::string> InvoiceStore::Impl::updateInvoice(const std::string& id)
 {
     const auto invoice = this->invoice(id);
     const auto totals = receiptTotals(invoice);
@@ -185,6 +187,7 @@ paid_at=CASE WHEN ? AND paid_at IS NULL THEN ? ELSE paid_at END WHERE id=?)SQL",
                {"to", state},
                {"received_atomic", std::to_string(totals.received)},
                {"confirmed_atomic", std::to_string(totals.confirmed)}});
+    return {invoice["status"].get<std::string>(), state};
 }
 
 InvoiceStore::InvoiceStore(const std::string& directory) : impl_(std::make_unique<Impl>(directory)) {}
@@ -311,10 +314,17 @@ void InvoiceStore::reconcile(const Json& snapshot)
         impl_->recordReceipt(target["id"], wallet, payment);
     }
     impl_->markMissingReceipts(wallet, seen);
+    std::vector<std::pair<std::string, std::string>> transitions;
     for (const auto& row : impl_->database.list(
              "SELECT id FROM invoices WHERE wallet_id=? AND creation_state='ready'", {wallet}))
-        impl_->updateInvoice(row["id"]);
+    {
+        auto transition = impl_->updateInvoice(row["id"]);
+        if (transition.first != transition.second) transitions.push_back(std::move(transition));
+    }
     transaction.commit();
+    for (const auto& transition : transitions)
+        qInfo().noquote() << "MerchantPayment invoice_status_committed epoch_ms=" << QDateTime::currentMSecsSinceEpoch()
+                          << "from=" << transition.first.c_str() << "to=" << transition.second.c_str();
 }
 Json InvoiceStore::snapshot(const Json& monitor) const
 {

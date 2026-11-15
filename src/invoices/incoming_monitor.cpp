@@ -2,12 +2,14 @@
 #include "incoming_payments.h"
 
 #include <QDateTime>
+#include <QDebug>
 #include <QMetaObject>
 #include <QObject>
 #include <QPointer>
 #include <QThread>
 #include <QTimer>
 #include <atomic>
+#include <chrono>
 #include <mutex>
 #include <nlohmann/json.hpp>
 
@@ -35,9 +37,9 @@ public:
         cache_ = {{"ok", true},        {"state", "starting"},  {"stale", false}, {"payments", Json::array()},
                   {"wallet", nullptr}, {"updated_at", nullptr}};
         timer_.setInterval(2000);
-        QObject::connect(&timer_, &QTimer::timeout, this, [this] { request(); });
+        QObject::connect(&timer_, &QTimer::timeout, this, [this] { request("timer"); });
         timer_.start();
-        QTimer::singleShot(0, this, [this] { request(); });
+        QTimer::singleShot(0, this, [this] { request("startup"); });
     }
     ~Monitor() override
     {
@@ -48,15 +50,15 @@ public:
         std::lock_guard<std::mutex> guard(mu_);
         return cache_.dump();
     }
-    void refresh() override
+    void refresh(const std::string& reason) override
     {
         QPointer<Monitor> self(this);
         QMetaObject::invokeMethod(
             this,
-            [self]
+            [self, reason]
             {
                 if (self)
-                    self->request();
+                    self->request(reason);
             },
             Qt::QueuedConnection);
     }
@@ -79,6 +81,7 @@ private:
     Json cache_;
     std::atomic<bool> stopped_{false};
     bool active_ = false, dirty_ = false;
+    std::string dirtyReason_;
 
     void publish(Json next)
     {
@@ -99,7 +102,8 @@ private:
         {
             dirty_ = false;
             // Coalesce bursts of balance/sync/state events into one next read.
-            QTimer::singleShot(100, this, [this] { request(); });
+            const auto reason = std::move(dirtyReason_);
+            QTimer::singleShot(100, this, [this, reason] { request(reason); });
         }
     }
     void failure(Json reply, bool keepRows = false)
@@ -184,16 +188,20 @@ private:
         }
         return true;
     }
-    void request()
+    void request(const std::string& reason)
     {
         if (stopped_)
             return;
         if (active_)
         {
             dirty_ = true;
+            if (dirtyReason_.empty()) dirtyReason_ = reason;
+            qDebug().noquote() << "MerchantPayment check_coalesced trigger=" << reason.c_str();
             return;
         }
         active_ = true;
+        qDebug().noquote() << "MerchantPayment check_start trigger=" << reason.c_str()
+                           << "epoch_ms=" << QDateTime::currentMSecsSinceEpoch();
         read("wallet_status",
              [this](Json before)
              {
@@ -209,9 +217,14 @@ private:
                               {"payments", Json::array()},
                               {"wallet", walletView(before)}});
                  }
+                 const auto started = std::chrono::steady_clock::now();
                  read("history",
-                      [this, before](Json history)
+                      [this, before, started](Json history)
                       {
+                          qDebug().noquote() << "MerchantPayment history_reply epoch_ms="
+                              << QDateTime::currentMSecsSinceEpoch() << "elapsed_ms="
+                              << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - started).count()
+                              << "ok=" << history.value("ok", false);
                           if (!history.value("ok", false))
                           {
                               failure(history, true);
@@ -231,6 +244,7 @@ private:
                                                 {"payments", Json::array()},
                                                 {"wallet", nullptr}});
                                        dirty_ = true;
+                                       if (dirtyReason_.empty()) dirtyReason_ = "wallet_changed";
                                        finish();
                                        return;
                                    }

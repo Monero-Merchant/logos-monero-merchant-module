@@ -12,7 +12,7 @@ public:
     using Notify = std::function<void(const std::string&)>;
     virtual ~IncomingMonitor() = default;
     virtual std::string snapshot() const = 0;
-    virtual void refresh() = 0;
+    virtual void refresh(const std::string& reason) = 0;
     virtual void stop() = 0;
 };
 

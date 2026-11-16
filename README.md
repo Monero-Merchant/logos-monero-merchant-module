@@ -18,7 +18,7 @@ https://raw.githubusercontent.com/Monero-Merchant/logos-monero-merchant-module/r
 
 Packages currently support macOS Apple Silicon (`darwin-arm64`) only. 
 
-Install `monero_merchant_ui`. Its declared dependencies resolve the merchant core, Delivery, and the required `libp2p_module`.
+Install `monero_merchant_ui`. Install the declared wallet, Delivery, libp2p and Ethereum RPC dependencies from the official Logos package repository. The Merchant catalog contains only Merchant packages.
 
 If an older incompatible discovery build is already installed, reinstall the compatible package from this catalog as described below.
 

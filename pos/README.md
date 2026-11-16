@@ -45,8 +45,8 @@ The output is `app/build/outputs/apk/debug/app-debug.apk`.
 
 ## Prepare Basecamp
 
-Build/install `delivery_module`, its compatible discovery module, and the
-Monero Merchant core and UI packages. The core owns Delivery and POS
+Install `delivery_module` and `libp2p_module` from the official Logos package
+repository, and build/install the Monero Merchant core and UI packages. The core owns Delivery and POS
 communication; the UI calls merchant SDK methods only. The wallet backend must
 provide the compatible `monero_wallet_backend` declared in the package metadata.
 
@@ -54,7 +54,7 @@ provide the compatible `monero_wallet_backend` declared in the package metadata.
 scripts/prepare-backend.sh
 ```
 
-Desktop package links are written to `artifacts/backend/`. Install their `.lgx`
+Merchant package links are written to `artifacts/backend/`. Install their `.lgx`
 packages using Basecamp's Package Manager, then fully
 quit and reopen Basecamp after replacing native modules. Open a Stagenet wallet
 in the wallet app. The POS service starts when the merchant core context loads

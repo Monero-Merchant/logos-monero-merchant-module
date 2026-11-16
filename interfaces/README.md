@@ -25,12 +25,8 @@ pinned flake's `packages.<system>.lidl` output over this compatibility subset.
 
 ## Discovery runtime dependency
 
-`libp2p_module.lidl` is the actual contract extracted from
-`assets/lidl/libp2p_module.lidl` in the pinned discovery `.lgx` produced by
-Delivery module revision `586e1a383ab2286be0c3a5f1d0f864a8fd37f5b8`.
-The merchant declares this required dependency so Basecamp loads discovery
-before the POS service. Delivery makes the discovery calls; the merchant does
-not expose its general libp2p API to terminals.
-
-Use the compatible package from this catalog rather than the older legacy
-build with an incompatible result format. The pinned package root hash is `78c301151f04920bb4bbb202024f3bbac932fa766e146a3a80a1d74559d568a4`.
+`libp2p_module.lidl` is the contract extracted from the official Logos
+`libp2p_module` 1.1.0 package. The merchant declares this required dependency so
+Basecamp loads discovery before the POS service. Delivery makes the discovery
+calls; the merchant does not expose its general libp2p API to terminals.
+Install the official Logos package instead of a Merchant-hosted copy.

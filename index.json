@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "repositoryName": "monero-merchant",
-  "generatedAt": "2026-11-16T03:39:10Z",
+  "generatedAt": "2026-11-16T03:43:10Z",
   "packages": [
     {
       "name": "monero_merchant",
@@ -53,7 +53,12 @@
           },
           "urls": [
             "https://github.com/Monero-Merchant/logos-monero-merchant-module/releases/download/v0.4.0-pre-release/logos-monero_merchant-module-lib.lgx"
-          ]
+          ],
+          "icon": {
+            "path": "icons/ed882d671524fd5610c22a46915580793d7ad1e004e4e7381fcc222fe98a6118.png",
+            "sha256": "ed882d671524fd5610c22a46915580793d7ad1e004e4e7381fcc222fe98a6118",
+            "size": 13839
+          }
         },
         {
           "releasedAt": "2026-11-10T17:41:00Z",
@@ -241,7 +246,12 @@
           },
           "urls": [
             "https://github.com/Monero-Merchant/logos-monero-merchant-module/releases/download/v0.4.0-pre-release/logos-monero_merchant_ui-module.lgx"
-          ]
+          ],
+          "icon": {
+            "path": "icons/ed882d671524fd5610c22a46915580793d7ad1e004e4e7381fcc222fe98a6118.png",
+            "sha256": "ed882d671524fd5610c22a46915580793d7ad1e004e4e7381fcc222fe98a6118",
+            "size": 13839
+          }
         },
         {
           "releasedAt": "2026-11-10T17:41:00Z",

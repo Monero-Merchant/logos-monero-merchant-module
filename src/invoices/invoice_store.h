@@ -28,7 +28,8 @@ public:
     void setConfirmationPolicy(int64_t confirmations);
     nlohmann::json find(const std::string& id) const;
     nlohmann::json reserve(const std::string& id, const std::string& title, const std::string& atomic,
-                           const nlohmann::json& wallet);
+                           const nlohmann::json& wallet, const nlohmann::json& pricing = nullptr);
+    void attachPricing(const std::string& id, const nlohmann::json& pricing);
     void markAttempted(const std::string& id);
     void bind(const std::string& id, uint32_t index, const std::string& address);
     void recoveryRequired(const std::string& id, const std::string& message);

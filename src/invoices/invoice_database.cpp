@@ -154,7 +154,7 @@ void InvoiceDatabase::initializeSchema()
         query.next();
         version = query.row().begin().value().get<int>();
     }
-    if (version != 0 && version != 4)
+    if (version != 0 && version != 4 && version != 5)
         throw InvoiceError(
             "unsupported_schema",
             "Unsupported invoice schema. Use fresh development state; legacy migration is not supported.");
@@ -179,6 +179,12 @@ CREATE TABLE invoice_events (
 );
 PRAGMA user_version=4;
 )SQL");
+        transaction.commit();
+    }
+    if (version == 0 || version == 4)
+    {
+        Transaction transaction(*this);
+        execute(db_, "ALTER TABLE invoices ADD COLUMN pricing_json TEXT; PRAGMA user_version=5;");
         transaction.commit();
     }
 }

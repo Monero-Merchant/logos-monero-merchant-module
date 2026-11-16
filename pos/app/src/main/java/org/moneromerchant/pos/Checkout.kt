@@ -3,11 +3,12 @@ package org.moneromerchant.pos
 import org.json.JSONObject
 import java.math.BigDecimal
 
-data class OrderIntent(val id: String, val amount: String)
+data class OrderIntent(val id: String, val amount: String, val currency: String = "XMR")
 data class PosInvoice(
     val id: String, val orderId: String, val amount: String, val received: String,
     val remaining: String, val status: String, val creationState: String, val paymentUri: String,
     val confirmations: Int, val stale: Boolean, val review: Boolean, val createdAt: Long,
+    val usdCents: String? = null, val rate: String? = null,
 ) {
     val accepted: Boolean get() = !stale && status in setOf("accepted", "paid")
     companion object {
@@ -16,6 +17,10 @@ data class PosInvoice(
             value.getString("received_xmr"), value.getString("remaining_xmr"), value.getString("status"),
             value.getString("creation_state"), value.optString("payment_uri"), value.getInt("required_confirmations"),
             value.optBoolean("stale", true), value.optBoolean("requires_review"), value.optLong("created_at"),
+            value.optJSONObject("pricing")?.optString("amount_usd_cents"),
+            value.optJSONObject("pricing")?.let { pricing ->
+                runCatching { BigDecimal(pricing.getString("price")).movePointLeft(pricing.getInt("decimals")).toPlainString() }.getOrNull()
+            },
         )
     }
 }
@@ -48,4 +53,19 @@ object XmrInput {
         return BigDecimal(value).setScale(12).toPlainString()
     }
     fun display(value: String): String = runCatching { BigDecimal(value).stripTrailingZeros().toPlainString() }.getOrDefault(value)
+}
+
+object UsdInput {
+    fun key(current: String, key: String): String {
+        if (key == "." && '.' in current) return current
+        if (key.matches(Regex("[0-9]")) && '.' in current && current.substringAfter('.').length >= 2) return current
+        return XmrInput.key(current, key)
+    }
+    fun valid(value: String): Boolean = runCatching {
+        value.matches(Regex("[0-9]{1,8}(\\.[0-9]{0,2})?")) && BigDecimal(value).signum() > 0
+    }.getOrDefault(false)
+    fun cents(value: String): String {
+        require(valid(value)) { "Enter a positive USD amount with at most two decimal places" }
+        return BigDecimal(value).movePointRight(2).toBigIntegerExact().toString()
+    }
 }

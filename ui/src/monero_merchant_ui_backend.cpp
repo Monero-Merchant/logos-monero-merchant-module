@@ -45,6 +45,16 @@ QString MoneroMerchantUiBackend::getInvoices() {
     const auto reply = modules().monero_merchant.getInvoices(&error);
     return checkedReply(reply, error);
 }
+QString MoneroMerchantUiBackend::getPriceSettings() {
+    logos::CallError error;
+    const auto reply = modules().monero_merchant.getPriceSettings(&error);
+    return checkedReply(reply, error);
+}
+QString MoneroMerchantUiBackend::setPriceSettings(QString settingsJson) {
+    logos::CallError error;
+    const auto reply = modules().monero_merchant.setPriceSettings(settingsJson, &error);
+    return checkedReply(reply, error);
+}
 QString MoneroMerchantUiBackend::setConfirmationPolicy(int confirmations) {
     logos::CallError error;
     const auto reply = modules().monero_merchant.setConfirmationPolicy(confirmations, &error);

@@ -10,6 +10,8 @@ class MoneroMerchantUiBackend : public MoneroMerchantUiSimpleSource,
 public:
     QString getWalletStatus() override;
     QString getInvoices() override;
+    QString getPriceSettings() override;
+    QString setPriceSettings(QString settingsJson) override;
     QString setConfirmationPolicy(int confirmations) override;
     QString createInvoice(QString requestId, QString title, QString amountXmr) override;
     QString recoverInvoice(QString invoiceId) override;

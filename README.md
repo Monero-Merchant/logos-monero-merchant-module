@@ -6,7 +6,7 @@ The `monero_merchant_backend ` uses the existing `monero_wallet_backend` through
 
 The `monero_merchant_backend ` manages invoice persistence, payment tracking, terminal pairing and request authorization. Wallet spend keys stay off Android.
 
-This is a development integration, limited to XMR invoices on Stagenet; fiat conversion, refunds, inventory and invoice cancellation/deletion are not implemented yet.
+This is a development integration, limited to XMR invoices on Stagenet; refunds, inventory and invoice cancellation/deletion are not implemented yet.
 
 ## Package Manager repository
 
@@ -27,9 +27,18 @@ If an older incompatible discovery build is already installed, reinstall the com
 1. Open a connected, synchronized Stagenet wallet in Basecamp's Monero wallet app.
 2. In Monero Merchant, choose **1**, **5** or **10 confirmations** (default **5**).
 3. Choose **Generate pairing QR**, scan the invitation on Android and approve in Basecamp. Invitations expire after five minutes and can be used once.
-4. Enter an XMR amount on Android and charge. The core assigns a receiving
+4. In Android Settings, select USD (default) or XMR as the checkout currency. For USD,
+   configure the endpoint and price feed under Basecamp **Wallet & settings → Manage**.
+   The endpoint is shared with other apps using the same chain.
+   The merchant module reads the XMR/USD Chainlink feed via `eth_rpc_module`;
+   no Ethereum transaction or account is needed. The RPC module must be installed.
+   The defaults reject a quote older than one hour or while the sequencer is down
+   or has recovered within the last hour. Both time limits and contract addresses are
+   editable; check that the freshness policy suits the selected feed's heartbeat. USD amounts are converted without a premium and rounded up
+   to the next XMR atomic unit; the resulting amount is fixed for that order.
+5. Enter an amount on Android and charge. The core assigns a receiving
    subaddress in wallet account 0 and returns the invoice payment QR.
-5. Track payment on Android or select the invoice in Basecamp.
+6. Track payment on Android or select the invoice in Basecamp.
 
 ## Invoice behavior and storage
 

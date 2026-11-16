@@ -104,6 +104,8 @@ struct InvoiceStore::Impl
         auto invoice = database.one("SELECT * FROM invoices WHERE id=?", {id});
         if (invoice.is_null())
             return invoice;
+        invoice["pricing"] = invoice["pricing_json"].is_null() ? Json() : Json::parse(invoice["pricing_json"].get<std::string>());
+        invoice.erase("pricing_json");
         const auto due = atomicNumber(invoice["amount_due_atomic"]);
         const auto received = atomicNumber(invoice["received_atomic"]);
         invoice["amount_due_xmr"] = xmrAmount(due);
@@ -212,7 +214,7 @@ void InvoiceStore::setConfirmationPolicy(int64_t confirmations)
     transaction.commit();
 }
 Json InvoiceStore::reserve(const std::string& id, const std::string& title, const std::string& atomic,
-                           const Json& wallet)
+                           const Json& wallet, const Json& pricing)
 {
     std::lock_guard<std::mutex> lock(impl_->mutex);
     if (id.size() < 12 || id.size() > 80 ||
@@ -229,7 +231,7 @@ Json InvoiceStore::reserve(const std::string& id, const std::string& title, cons
     if (!existing.is_null())
     {
         if (existing["wallet_id"] != identity || existing["title"] != title ||
-            existing["amount_due_atomic"] != atomic)
+            existing["amount_due_atomic"] != atomic || existing["pricing"] != pricing)
             throw InvoiceError("request_conflict", "This request ID already belongs to a different invoice.");
         return existing;
     }
@@ -237,12 +239,25 @@ Json InvoiceStore::reserve(const std::string& id, const std::string& title, cons
     const auto policy = impl_->confirmationPolicy();
     impl_->database.write("INSERT INTO "
                           "invoices(id,wallet_id,wallet_name,network,wallet_address,title,amount_due_atomic,"
-                          "required_confirmations,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)",
+                          "required_confirmations,created_at,updated_at,pricing_json) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
                           {id, identity, wallet.at("wallet"), wallet.at("network"), wallet.at("address"),
-                           title, atomic, policy, now(), now()});
+                           title, atomic, policy, now(), now(), pricing.is_null() ? Json() : Json(pricing.dump())});
     impl_->event(id, "creation_started", {{"amount_atomic", atomic}, {"required_confirmations", policy}});
     transaction.commit();
     return impl_->invoice(id);
+}
+void InvoiceStore::attachPricing(const std::string& id, const Json& pricing)
+{
+    if (pricing.is_null()) return;
+    std::lock_guard<std::mutex> lock(impl_->mutex);
+    const auto existing = impl_->invoice(id);
+    if (existing.is_null()) throw InvoiceError("not_found", "Invoice does not exist.");
+    if (!existing["pricing"].is_null()) {
+        if (existing["pricing"] != pricing)
+            throw InvoiceError("request_conflict", "This invoice already has a different exchange rate.");
+        return;
+    }
+    impl_->database.write("UPDATE invoices SET pricing_json=? WHERE id=? AND pricing_json IS NULL", {pricing.dump(), id});
 }
 void InvoiceStore::markAttempted(const std::string& id)
 {

@@ -3,15 +3,22 @@
 #include "invoices/incoming_payments.h"
 #include "invoices/invoice_store.h"
 #include "invoices/merchant_amounts.h"
+#include "invoices/usd_amounts.h"
 #include "logos_sdk.h"
 #include "pos/pos_delivery.h"
 
 #include <algorithm>
 #include <chrono>
 #include <QDateTime>
+#include <QDir>
+#include <QFile>
+#include <QSaveFile>
+#include <QUrl>
 #include <QDebug>
 #include <nlohmann/json.hpp>
 #include <vector>
+#include <limits>
+#include <ctime>
 
 namespace
 {
@@ -86,6 +93,75 @@ void validateInvoiceAddress(const nlohmann::json& address, const nlohmann::json&
 
 } // namespace
 
+std::string MoneroMerchantImpl::getPriceSettings()
+{
+    nlohmann::json settings;
+    {
+        std::lock_guard<std::mutex> lock(priceSettingsMutex_);
+        settings = nlohmann::json::parse(priceSettings_, nullptr, false);
+    }
+    if (!settings.is_object()) return error("invalid_price_settings", "Price settings could not be read.");
+    try {
+        const auto chain = settings.at("chain_id").get<int64_t>();
+        logos::CallError callError;
+        const auto raw = modules().eth_rpc_module.get_chain_config(chain, &callError, 5000);
+        if (!callError.ok()) return error("rpc_unavailable", "Ethereum RPC module is unavailable.");
+        const auto reply = nlohmann::json::parse(raw);
+        if (!reply.value("ok", false)) {
+            if (reply.value("error", "") != "no config for chain " + std::to_string(chain))
+                return error("rpc_unavailable", "Could not read the shared chain configuration.");
+            settings["endpoint"] = "";
+        } else settings["endpoint"] = reply.at("config").at("endpoint");
+        return nlohmann::json{{"ok", true}, {"settings", settings}}.dump();
+    } catch (...) { return error("invalid_price_settings", "Could not read the price or RPC settings."); }
+}
+
+std::string MoneroMerchantImpl::setPriceSettings(const std::string& settingsJson)
+{
+    try {
+        auto input = nlohmann::json::parse(settingsJson);
+        const auto chain = input.at("chain_id").get<int64_t>();
+        const auto feed = input.at("feed").get<std::string>();
+        const auto sequencer = input.at("sequencer").get<std::string>();
+        const auto endpoint = input.at("endpoint").get<std::string>();
+        const auto age = input.at("max_age_seconds").get<int64_t>();
+        const auto grace = input.at("grace_seconds").get<int64_t>();
+        auto address = [](const std::string& s) {
+            return s.size() == 42 && s.substr(0, 2) == "0x" &&
+                s.find_first_not_of("0123456789abcdefABCDEF", 2) == std::string::npos &&
+                s.substr(2).find_first_not_of('0') != std::string::npos;
+        };
+        const QUrl url(QString::fromStdString(endpoint), QUrl::StrictMode);
+        if (chain <= 0 || chain > 2147483647 || !address(feed) ||
+            (!sequencer.empty() && !address(sequencer)) || (chain == 42161 && sequencer.empty()) ||
+            age < 1 || age > 604800 || grace < 0 || grace > 604800 ||
+            !url.isValid() || url.host().isEmpty() || (url.scheme() != "https" && url.scheme() != "http") ||
+            !url.userInfo().isEmpty() || url.hasFragment())
+            return error("invalid_price_settings", "Check the chain ID, endpoint, contract addresses and time limits.");
+        logos::CallError callError;
+        const auto existingRaw = modules().eth_rpc_module.get_chain_config(chain, &callError, 5000);
+        if (!callError.ok()) return error("rpc_unavailable", "Ethereum RPC module is unavailable.");
+        const auto existing = nlohmann::json::parse(existingRaw);
+        nlohmann::json rpcConfig;
+        if (existing.value("ok", false)) rpcConfig = existing.at("config");
+        else if (existing.value("error", "") == "no config for chain " + std::to_string(chain)) rpcConfig = nlohmann::json::object();
+        else return error("rpc_unavailable", "Could not read the shared chain configuration.");
+        rpcConfig["endpoint"] = endpoint;
+        const bool saved = modules().eth_rpc_module.set_chain_config(chain, rpcConfig.dump(), &callError, 5000);
+        if (!callError.ok() || !saved) return error("rpc_save_failed", "Could not save the shared Ethereum RPC endpoint.");
+        nlohmann::json settings{{"chain_id", chain}, {"feed", feed}, {"sequencer", sequencer},
+                               {"max_age_seconds", age}, {"grace_seconds", grace}};
+        const auto serialized = settings.dump();
+        std::lock_guard<std::mutex> lock(priceSettingsMutex_);
+        QSaveFile file(QString::fromStdString(instancePersistencePath()) + "/price-settings.json");
+        if (!file.open(QIODevice::WriteOnly) || file.write(serialized.data(), serialized.size()) != static_cast<qint64>(serialized.size()) || !file.commit())
+            return error("price_save_failed", "The shared RPC endpoint was saved, but price settings could not be saved.");
+        priceSettings_ = serialized;
+        settings["endpoint"] = endpoint;
+        return nlohmann::json{{"ok", true}, {"settings", settings}}.dump();
+    } catch (...) { return error("invalid_price_settings", "Invalid price settings."); }
+}
+
 std::string MoneroMerchantImpl::getWalletStatus()
 {
     // Wallet IPC marshals onto the main thread. Holding stateMutex_ here
@@ -102,6 +178,18 @@ MoneroMerchantImpl::~MoneroMerchantImpl()
 
 void MoneroMerchantImpl::onContextReady()
 {
+    {
+        std::lock_guard<std::mutex> lock(priceSettingsMutex_);
+        QFile file(QString::fromStdString(instancePersistencePath()) + "/price-settings.json");
+        if (file.exists()) {
+            if (file.open(QIODevice::ReadOnly)) priceSettings_ = file.readAll().toStdString();
+            else priceSettings_ = "invalid";
+        } else priceSettings_ = nlohmann::json{{"chain_id", 42161},
+            {"feed", "0x8c76E8cab5ef3B410a318DDb82d83Ed47D7d2701"},
+            {"sequencer", "0xFdB631F5EE196F0ed6FAa767959853A9F217697D"},
+            {"max_age_seconds", 3600}, {"grace_seconds", 3600}}.dump();
+    }
+
     try
     {
         invoices_ = std::make_shared<merchant::InvoiceStore>(instancePersistencePath());
@@ -178,8 +266,67 @@ void MoneroMerchantImpl::onContextReady()
                     return nlohmann::json::parse(getWalletStatus());
                 if (method == "getInvoices")
                     return nlohmann::json::parse(getInvoices());
-                if (method == "createPosInvoice" && args.size() == 4)
-                    return nlohmann::json::parse(createInvoiceForWallet(args[0], args[1], args[2], args[3]));
+                if (method == "quoteUsd" && args.size() == 1)
+                {
+                    const auto cents = args[0].get<uint64_t>();
+                    if (!cents || cents > 9999999999ULL)
+                        throw std::runtime_error("Invalid USD amount");
+                    nlohmann::json settings;
+                    {
+                        std::lock_guard<std::mutex> lock(priceSettingsMutex_);
+                        settings = nlohmann::json::parse(priceSettings_);
+                    }
+                    const auto chain = settings.at("chain_id").get<int64_t>();
+                    auto rpc = [this, chain](const char* method, const nlohmann::json& params) {
+                        logos::CallError err;
+                        auto raw = modules().eth_rpc_module.raw_rpc(chain, method, params.dump(), &err, 15000);
+                        if (!err.ok()) throw std::runtime_error("Price RPC unavailable; check Wallet & settings");
+                        auto v = nlohmann::json::parse(raw, nullptr, false);
+                        if (!v.is_object() || !v.value("ok", false) || !v.contains("result") || !v["result"].is_string())
+                            throw std::runtime_error("Price RPC request failed; check network and proxy settings");
+                        return v["result"].get<std::string>();
+                    };
+                    auto word = [](const std::string& hex, size_t offset) -> uint64_t {
+                        if (hex.size() < 2 + offset + 64 || hex.substr(0, 2) != "0x")
+                            throw std::runtime_error("Invalid oracle response");
+                        auto w = hex.substr(2 + offset, 64);
+                        if (w.find_first_not_of("0123456789abcdefABCDEF") != std::string::npos ||
+                            w.substr(0, 48).find_first_not_of('0') != std::string::npos)
+                            throw std::runtime_error("Oracle value out of range");
+                        return std::stoull(w.substr(48), nullptr, 16);
+                    };
+                    auto read = [&](const char* address, const char* data) {
+                        return rpc("eth_call", nlohmann::json::array({{{"to", address}, {"data", data}}, "latest"}));
+                    };
+                    const auto chainHex = rpc("eth_chainId", nlohmann::json::array());
+                    if (chainHex.size() < 3 || chainHex.substr(0, 2) != "0x" ||
+                        chainHex.find_first_not_of("0123456789abcdefABCDEF", 2) != std::string::npos ||
+                        std::stoull(chainHex.substr(2), nullptr, 16) != static_cast<uint64_t>(chain))
+                        throw std::runtime_error("Configured RPC returned a different chain ID");
+                    const auto now = static_cast<uint64_t>(std::time(nullptr));
+                    const auto sequencer = settings.at("sequencer").get<std::string>();
+                    if (!sequencer.empty()) {
+                        const auto uptime = read(sequencer.c_str(), "0xfeaf968c");
+                        const auto started = word(uptime, 128);
+                        if (word(uptime, 64) != 0 || !started || started > now ||
+                            now - started <= settings.at("grace_seconds").get<uint64_t>())
+                            throw std::runtime_error("Sequencer unavailable or recovering");
+                    }
+                    const auto feed = settings.at("feed").get<std::string>();
+                    const auto decimals = word(read(feed.c_str(), "0x313ce567"), 0);
+                    if (decimals > 12) throw std::runtime_error("Unsupported oracle precision");
+                    const auto quote = read(feed.c_str(), "0xfeaf968c");
+                    const auto price = word(quote, 64);
+                    const auto updated = word(quote, 192);
+                    if (!price || !updated || updated > now || now - updated > settings.at("max_age_seconds").get<uint64_t>())
+                        throw std::runtime_error("XMR/USD price is unavailable or too old");
+                    const auto atomic = merchant::usdToAtomic(cents, price, decimals);
+                    return nlohmann::json{{"amount_xmr", merchant::xmrAmount(static_cast<uint64_t>(atomic))},
+                                          {"price", std::to_string(price)}, {"decimals", decimals}, {"updated_at", updated},
+                                          {"chain_id", chain}, {"feed", feed}};
+                }
+                if (method == "createPosInvoice" && args.size() == 5)
+                    return nlohmann::json::parse(createInvoiceForWallet(args[0], args[1], args[2], args[3], args[4]));
                 throw std::runtime_error("Unsupported POS backend operation");
             });
         posError_.clear();
@@ -280,7 +427,8 @@ std::string MoneroMerchantImpl::createInvoice(const std::string& requestId, cons
 
 std::string MoneroMerchantImpl::createInvoiceForWallet(const std::string& requestId, const std::string& title,
                                                        const std::string& amountXmr,
-                                                       const std::string& expectedWallet)
+                                                       const std::string& expectedWallet,
+                                                       const std::string& pricingJson)
 {
     std::unique_lock<std::mutex> operation(invoiceOperationMutex_, std::try_to_lock);
     if (!operation.owns_lock())
@@ -303,6 +451,7 @@ std::string MoneroMerchantImpl::createInvoiceForWallet(const std::string& reques
     }
     try
     {
+        const auto pricing = pricingJson.empty() ? nlohmann::json() : nlohmann::json::parse(pricingJson);
         nlohmann::json existing;
         {
             std::lock_guard<std::recursive_mutex> lock(stateMutex_);
@@ -314,6 +463,11 @@ std::string MoneroMerchantImpl::createInvoiceForWallet(const std::string& reques
                 return error("wallet_changed", "Return to the original POS order wallet.");
             if (existing["amount_due_atomic"] != amount || existing["title"] != title)
                 return error("request_conflict", "This request ID already belongs to a different invoice.");
+            if (!pricing.is_null()) {
+                store->attachPricing(requestId, pricing);
+                existing = store->find(requestId);
+            } else if (!existing["pricing"].is_null())
+                return error("request_conflict", "This invoice has different pricing details.");
             if (existing["creation_state"] == "ready")
                 return invoiceReply(existing, true);
             return finishInvoiceAddress(store, requestId, !existing["allocation_attempted"].get<bool>());
@@ -337,7 +491,7 @@ std::string MoneroMerchantImpl::createInvoiceForWallet(const std::string& reques
         }
         {
             std::lock_guard<std::recursive_mutex> lock(stateMutex_);
-            (void)store->reserve(requestId, title, amount, status);
+            (void)store->reserve(requestId, title, amount, status, pricing);
         }
         return finishInvoiceAddress(store, requestId, true);
     }

@@ -19,6 +19,10 @@
     {
       "name": "libp2p_module",
       "version": "1.0.0"
+    },
+    {
+      "name": "eth_rpc_module",
+      "version": "0.1.0"
     }
   ],
   "dependency_overrides": {
@@ -32,6 +36,9 @@
     },
     "libp2p_module": {
       "file": "interfaces/libp2p_module.lidl"
+    },
+    "eth_rpc_module": {
+      "file": "interfaces/eth_rpc_module.lidl"
     }
   },
   "nix": {

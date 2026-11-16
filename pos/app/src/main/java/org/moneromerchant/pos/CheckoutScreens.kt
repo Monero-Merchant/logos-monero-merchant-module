@@ -26,6 +26,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -80,6 +81,9 @@ fun MerchantApp(model: ConnectionViewModel = viewModel()) {
                 val checkout: CheckoutViewModel = viewModel(key = "checkout-${connection.merchant!!.peerId}-${connection.localPeer}", factory = object : ViewModelProvider.Factory {
                     @Suppress("UNCHECKED_CAST") override fun <T : ViewModel> create(modelClass: Class<T>): T = CheckoutViewModel(model.connection.checkoutFor(connection.merchant!!.peerId, connection.localPeer)) as T
                 })
+                val preferences = LocalContext.current.getSharedPreferences("checkout", android.content.Context.MODE_PRIVATE)
+                var currency by remember { mutableStateOf(preferences.getString("currency", "USD") ?: "USD") }
+                LaunchedEffect(checkout, currency) { checkout.setCurrency(currency) }
                 LaunchedEffect(checkout, lifecycle) {
                     lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
                         launch { while (true) { if (model.state.value.online) checkout.refreshActiveInvoice(); delay(2000) } }
@@ -88,7 +92,9 @@ fun MerchantApp(model: ConnectionViewModel = viewModel()) {
                 }
                 CheckoutApp(checkout, connection.online, connection.merchant!!.name, connection.detail,
                     manuallyDisconnected = connection.manuallyDisconnected, connectionBusy = connection.busy,
-                    disconnect = model::disconnect, reconnect = model::reconnect) { PairingScreen(model, connection, Modifier) }
+                    disconnect = model::disconnect, reconnect = model::reconnect) { PairingScreen(model, connection, Modifier, currency) { selected ->
+                        preferences.edit().putString("currency", selected).apply(); currency = selected
+                    } }
             }
         }
     }
@@ -137,7 +143,7 @@ fun CheckoutApp(model: CheckoutViewModel, online: Boolean, merchant: String, con
                 "settings" -> settings()
                 "transactions" -> TransactionsScreen(state, model::loadMoreInvoices)
                 else -> if (state.order == null) AmountScreen(state, online, model::key, model::create)
-                        else InvoiceScreen(state, model::newOrder)
+                        else InvoiceScreen(state, model::newOrder, model::create, online)
             }
         }
     }
@@ -154,7 +160,7 @@ private fun AmountScreen(state: CheckoutState, online: Boolean, key: (String) ->
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(24.dp)) {
-                        Text("XMR", color = MaterialTheme.colorScheme.primary, fontSize = 16.sp)
+                        Text(state.currency, color = MaterialTheme.colorScheme.primary, fontSize = 16.sp)
                         Text(state.input, fontSize = 32.sp, modifier = Modifier.testTag("amount"))
                     }
                 }
@@ -174,7 +180,7 @@ private fun AmountScreen(state: CheckoutState, online: Boolean, key: (String) ->
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     CheckoutControl(R.drawable.close_24px, "Clear", Modifier.weight(1f).testTag("clearAmount"), !state.busy, Color.White, MaterialTheme.colorScheme.onPrimaryContainer) { key("clear") }
                     CheckoutControl(R.drawable.arrow_back_24px, "Delete", Modifier.weight(1f), !state.busy, MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.colorScheme.onSecondaryContainer) { key("delete") }
-                    CheckoutControl(R.drawable.check_24px, "Charge", Modifier.weight(1f).testTag("createInvoice"), online && state.initialized && !state.busy && XmrInput.valid(state.input), MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.onPrimary, create)
+                    CheckoutControl(R.drawable.check_24px, "Charge", Modifier.weight(1f).testTag("createInvoice"), online && state.initialized && !state.busy && (if (state.currency == "USD") UsdInput.valid(state.input) else XmrInput.valid(state.input)), MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.onPrimary, create)
                 }
             }
         }
@@ -206,9 +212,13 @@ private fun CheckoutControl(icon: Int, label: String, modifier: Modifier, enable
 }
 
 @Composable
-private fun InvoiceScreen(state: CheckoutState, newOrder: () -> Unit) {
+private fun InvoiceScreen(state: CheckoutState, newOrder: () -> Unit, retry: () -> Unit, online: Boolean) {
     val invoice = state.invoice
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(18.dp)) {
+        if (state.order?.currency == "USD") {
+            Text("USD ${java.math.BigDecimal(state.order.amount).movePointLeft(2).setScale(2).toPlainString()}", color = Muted)
+        }
+        if (invoice?.rate != null) Text("Exchange rate: $${invoice.rate} / XMR", color = Muted)
         if (invoice?.accepted == true) {
             Text("✓", color = Green, fontSize = 90.sp)
             Text(if (invoice.status == "paid") "Payment confirmed" else "Payment accepted", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.testTag("paymentSuccess"))
@@ -218,13 +228,15 @@ private fun InvoiceScreen(state: CheckoutState, newOrder: () -> Unit) {
             Button(onClick = newOrder, enabled = !state.busy, modifier = Modifier.fillMaxWidth().height(64.dp).testTag("newOrder"), colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Color.Black)) { Text("New order") }
         } else {
             Text(if (invoice?.status == "partial") "Partial payment received" else "Waiting for payment", style = MaterialTheme.typography.headlineMedium)
-            Text("${XmrInput.display(invoice?.remaining ?: state.order!!.amount)} XMR", fontSize = 30.sp)
+            if (invoice != null) Text("${XmrInput.display(invoice.remaining)} XMR", fontSize = 30.sp)
+            else Text(if (state.order!!.currency == "USD") "Preparing USD invoice" else "${XmrInput.display(state.order.amount)} XMR", fontSize = 30.sp)
             if (state.busy) CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
             if (invoice != null && invoice.creationState == "ready") {
                 if (!invoice.stale && invoice.paymentUri.isNotBlank() && invoice.status in setOf("pending", "partial")) PaymentQr(invoice.paymentUri)
                 Text("Received ${XmrInput.display(invoice.received)} XMR", color = Muted)
                 Text("Status: ${invoice.status}${if (invoice.stale) " · last known, reconnecting" else ""}", color = if (invoice.stale) Color(0xFFFFD477) else MaterialTheme.colorScheme.primary, modifier = Modifier.testTag("invoiceStatus"))
             }
+            if (invoice == null && !state.busy) Button(onClick = retry, enabled = online, modifier = Modifier.fillMaxWidth()) { Text("Retry order") }
             FilledTonalButton(onClick = newOrder, enabled = !state.busy,
                 modifier = Modifier.fillMaxWidth().height(64.dp).testTag("cancelOrder")) { Text("Cancel") }
         }
@@ -266,6 +278,7 @@ private fun TransactionsScreen(state: CheckoutState, loadMore: () -> Unit) {
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text("${XmrInput.display(invoice.amount)} XMR", fontSize = 21.sp)
+                    if (invoice.rate != null) Text("Rate: $${invoice.rate} / XMR", color = Muted, fontSize = 12.sp)
                     Text(invoice.status.replaceFirstChar { it.uppercase() } + if (invoice.stale) " · last known" else "", color = if (invoice.accepted) Green else MaterialTheme.colorScheme.primary)
                     Text("Received ${XmrInput.display(invoice.received)} · remaining ${XmrInput.display(invoice.remaining)} XMR", color = Muted, fontSize = 12.sp)
                     Text("Order ${invoice.orderId.take(8)} · ${DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(invoice.createdAt))}", color = Muted, fontSize = 11.sp)

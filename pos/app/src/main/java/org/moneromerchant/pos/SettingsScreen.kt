@@ -25,6 +25,8 @@ fun TerminalSettingsScreen(
     disconnect: () -> Unit,
     forget: () -> Unit,
     modifier: Modifier = Modifier,
+    currency: String = "USD",
+    setCurrency: (String) -> Unit = {},
 ) {
     var showTechnicalDetails by rememberSaveable { mutableStateOf(false) }
     var confirmForget by remember { mutableStateOf(false) }
@@ -40,6 +42,18 @@ fun TerminalSettingsScreen(
                 .padding(horizontal = 24.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp),
         ) {
+            SettingsSection("Checkout currency") {
+                var expanded by remember { mutableStateOf(false) }
+                Box {
+                    OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth(),
+                        enabled = state.approved) { Text(currency) }
+                    DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                        listOf("USD", "XMR").forEach { option ->
+                            DropdownMenuItem(text = { Text(option) }, onClick = { expanded = false; setCurrency(option) })
+                        }
+                    }
+                }
+            }
             SettingsSection("Merchant connection") {
                 Surface(color = statusColor.copy(alpha = 0.12f), shape = CircleShape) {
                     Row(Modifier.padding(horizontal = 12.dp, vertical = 8.dp),

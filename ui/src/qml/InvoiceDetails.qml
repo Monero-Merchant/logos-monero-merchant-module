@@ -28,6 +28,18 @@ Panel {
         font.pixelSize: root.invoice ? 24 : 14; font.weight: Font.DemiBold
         Layout.fillWidth: true
     }
+    function decimalUnits(raw, decimals) {
+        let digits = String(raw)
+        while (digits.length <= decimals) digits = "0" + digits
+        return decimals ? digits.slice(0, -decimals) + "." + digits.slice(-decimals) : digits
+    }
+    MerchantText {
+        objectName: "invoiceExchangeRate"
+        visible: !!root.invoice && !!root.invoice.pricing && root.invoice.pricing.currency === "USD"
+        text: visible ? "Sale: $" + root.decimalUnits(root.invoice.pricing.amount_usd_cents, 2) +
+            " · Rate: $" + root.decimalUnits(root.invoice.pricing.price, root.invoice.pricing.decimals) + " / XMR" : ""
+        Layout.fillWidth: true; color: MerchantStyle.MerchantTheme.ink
+    }
     Rectangle {
         visible: !!root.invoice && (root.stale || root.invoice.requires_review)
         Layout.fillWidth: true

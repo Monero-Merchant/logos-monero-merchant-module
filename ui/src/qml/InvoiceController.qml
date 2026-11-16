@@ -14,6 +14,15 @@ QtObject {
     property bool storageAvailable: false
     property bool reading: false
     property bool mutating: false
+    property var priceSettings: null
+    property bool priceBusy: false
+    property string priceError: ""
+    property string priceNotice: ""
+    property int priceGeneration: 0
+    property Timer priceTimeout: Timer {
+        interval: 20000
+        onTriggered: { ++controller.priceGeneration; controller.priceBusy = false; controller.priceError = "Price settings timed out. Reload to check the saved settings." }
+    }
     property int confirmationPolicy: 5
     property bool policyLoaded: false
     property bool savingPolicy: false
@@ -53,7 +62,8 @@ QtObject {
     onReadyChanged: {
         ++generation
         ++policyRequest; savingPolicy = false; policyTimeout.stop(); policyLoaded = false; policyError = ""
-        if (ready) { read(); loadQr() }
+        ++priceGeneration; priceBusy = false; priceTimeout.stop()
+        if (ready) { read(); loadQr(); loadPriceSettings() }
         else {
             reading = false; readTimeout.stop(); stale = true
             if (mutating) {
@@ -130,6 +140,30 @@ QtObject {
             })
         } catch (e) { error = String(e); reading = false; readTimeout.stop() }
     }
+    function priceRequest(operation, settings) {
+        if (!ready || !client || !watchReply || priceBusy) return
+        priceBusy = true; priceError = ""; priceNotice = ""; priceTimeout.restart()
+        const token = ++priceGeneration
+        function fail(reason) {
+            if (!controller || token !== controller.priceGeneration) return
+            controller.priceBusy = false; controller.priceTimeout.stop(); controller.priceError = String(reason)
+        }
+        try {
+            const reply = operation === "get" ? client.getPriceSettings() : client.setPriceSettings(JSON.stringify(settings))
+            watchReply(reply, function(raw) {
+                if (!controller || token !== controller.priceGeneration || !controller.ready) return
+                try {
+                    const result = JSON.parse(String(raw))
+                    if (result.ok !== true || !result.settings) throw new Error(result.error || "Invalid settings reply")
+                    controller.priceSettings = result.settings
+                    controller.priceBusy = false; controller.priceTimeout.stop()
+                    if (operation === "set") controller.priceNotice = "Price settings saved."
+                } catch (e) { fail(e) }
+            }, fail)
+        } catch (e) { fail(e) }
+    }
+    function loadPriceSettings() { priceRequest("get", null) }
+    function savePriceSettings(settings) { priceRequest("set", settings) }
     function setPolicy(confirmations) {
         if (!ready || !client || !watchReply || !storageAvailable || mutating || savingPolicy
             || [1, 5, 10].indexOf(confirmations) < 0 || confirmations === confirmationPolicy) return

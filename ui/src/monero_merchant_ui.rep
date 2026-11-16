@@ -2,6 +2,8 @@ class MoneroMerchantUi
 {
     SLOT(QString getWalletStatus())
     SLOT(QString getInvoices())
+    SLOT(QString getPriceSettings())
+    SLOT(QString setPriceSettings(QString settingsJson))
     SLOT(QString setConfirmationPolicy(int confirmations))
     SLOT(QString createInvoice(QString requestId, QString title, QString amountXmr))
     SLOT(QString recoverInvoice(QString invoiceId))

@@ -31,6 +31,10 @@ public:
     /// Sets the persisted confirmation default (1, 5 or 10) for new invoices only.
     std::string setConfirmationPolicy(int64_t confirmations);
 
+    /// Reads and updates the USD price-feed configuration.
+    std::string getPriceSettings();
+    std::string setPriceSettings(const std::string& settingsJson);
+
     /// Creates one XMR invoice with an idempotency key and a new account 0 subaddress.
     std::string createInvoice(const std::string& requestId, const std::string& title,
                               const std::string& amountXmr);
@@ -65,12 +69,15 @@ protected:
 
 private:
     std::recursive_mutex stateMutex_;
+    std::mutex priceSettingsMutex_;
+    std::string priceSettings_;
     // Never wait on this gate: a wallet IPC call can re-enter the main thread.
     std::mutex invoiceOperationMutex_;
     std::shared_ptr<merchant::pos::Delivery> pos_;
     std::string posError_;
     std::string createInvoiceForWallet(const std::string& requestId, const std::string& title,
-                                       const std::string& amountXmr, const std::string& expectedWallet);
+                                       const std::string& amountXmr, const std::string& expectedWallet,
+                                       const std::string& pricingJson = "");
     std::shared_ptr<IncomingMonitor> incoming_;
     std::function<void()> cancelSubscriptions_;
     std::shared_ptr<merchant::InvoiceStore> invoices_;

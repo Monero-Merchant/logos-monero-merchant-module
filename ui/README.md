@@ -92,14 +92,10 @@ Missing receipts and confirmation regressions can change invoice status and flag
 it for review. **Mark reviewed** acknowledges the flag without marking it paid.
 The backend keeps its SQLite ledger and first accepted/paid timestamps.
 
-## UI checks
+## USD price settings
 
-With Qt Quick Test available, run from the repository root:
-
-```sh
-QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software qmltestrunner -input ui/tests
-```
-
-The dashboard tests use sample invoices and a fake client to check search, filters,
-payment updates, stale-data warnings, collapsed management sections, clipboard
-copying and narrow layouts. They do not connect to a wallet or send payments.
+Open **Wallet & settings → Manage** to edit the XMR/USD feed chain ID, shared
+Ethereum RPC endpoint, price feed and sequencer contracts, maximum price age,
+and sequencer recovery grace period. The defaults target the Arbitrum feed.
+The RPC endpoint is shared by other applications using the same chain. Existing
+USD orders retain their fixed XMR amount when these settings change.

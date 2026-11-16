@@ -31,9 +31,9 @@ import java.util.Date
 
 @Composable
 fun PairingScreen(model: ConnectionViewModel, state: ConnectionUiState,
-    modifier: Modifier = Modifier.safeDrawingPadding()) {
+    modifier: Modifier = Modifier.safeDrawingPadding(), currency: String = "USD", setCurrency: (String) -> Unit = {}) {
     if (state.merchant != null) {
-        TerminalSettingsScreen(state, model::reconnect, model::disconnect, model::forget, modifier)
+        TerminalSettingsScreen(state, model::reconnect, model::disconnect, model::forget, modifier, currency, setCurrency)
         return
     }
     // Invitations contain a secret: deliberately keep them out of saved instance state.

@@ -91,7 +91,7 @@ class MerchantConnection(private val store: SecureStore) : CheckoutGateway {
         return object : CheckoutGateway {
             override suspend fun savedOrder() = readOrder(scope)
             override suspend fun saveOrder(order: OrderIntent?) = writeOrder(order, scope)
-            override suspend fun createInvoice(order: OrderIntent) = PosInvoice.parse(invoiceRequest("CreateInvoice", JSONObject().put("order_id", order.id).put("amount_xmr", order.amount), scope).getJSONObject("invoice"))
+            override suspend fun createInvoice(order: OrderIntent) = PosInvoice.parse(invoiceRequest("CreateInvoice", orderArgs(order), scope).getJSONObject("invoice"))
             override suspend fun getInvoice(orderId: String) = PosInvoice.parse(invoiceRequest("GetInvoice", JSONObject().put("order_id", orderId), scope).getJSONObject("invoice"))
             override suspend fun getInvoices(offset: Int) = invoicePage(offset, scope)
         }
@@ -101,7 +101,7 @@ class MerchantConnection(private val store: SecureStore) : CheckoutGateway {
         lock.withLock {
             if (record == null) record = store.load()
             validateScope(scope)
-            record?.optJSONObject("active_order")?.let { OrderIntent(it.getString("id"), it.getString("amount")) }
+            record?.optJSONObject("active_order")?.let { OrderIntent(it.getString("id"), it.getString("amount"), it.optString("currency", "XMR")) }
         }
     }
     override suspend fun saveOrder(order: OrderIntent?) = writeOrder(order, null)
@@ -110,10 +110,12 @@ class MerchantConnection(private val store: SecureStore) : CheckoutGateway {
             validateScope(scope)
             val saved = record ?: store.load() ?: error("Pair with a merchant first")
             if (order == null) saved.remove("active_order")
-            else saved.put("active_order", JSONObject().put("id", order.id).put("amount", order.amount))
+            else saved.put("active_order", JSONObject().put("id", order.id).put("amount", order.amount).put("currency", order.currency))
             store.save(saved); record = saved
         }
     }
+    private fun orderArgs(order: OrderIntent): JSONObject = JSONObject().put("order_id", order.id)
+        .put("currency", order.currency).put(if (order.currency == "USD") "amount_usd_cents" else "amount_xmr", order.amount)
     private suspend fun invoiceRequest(type: String, args: JSONObject, scope: Pair<String, String>? = null): JSONObject = withContext(Dispatchers.IO) {
         lock.withLock {
             validateScope(scope)
@@ -123,7 +125,7 @@ class MerchantConnection(private val store: SecureStore) : CheckoutGateway {
             reply
         }
     }
-    override suspend fun createInvoice(order: OrderIntent): PosInvoice = PosInvoice.parse(invoiceRequest("CreateInvoice", JSONObject().put("order_id", order.id).put("amount_xmr", order.amount)).getJSONObject("invoice"))
+    override suspend fun createInvoice(order: OrderIntent): PosInvoice = PosInvoice.parse(invoiceRequest("CreateInvoice", orderArgs(order)).getJSONObject("invoice"))
     override suspend fun getInvoice(orderId: String): PosInvoice = PosInvoice.parse(invoiceRequest("GetInvoice", JSONObject().put("order_id", orderId)).getJSONObject("invoice"))
     override suspend fun getInvoices(offset: Int): InvoicePage {
         return invoicePage(offset, null)

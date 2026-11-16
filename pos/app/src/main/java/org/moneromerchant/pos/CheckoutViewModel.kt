@@ -11,7 +11,7 @@ import kotlinx.coroutines.sync.withLock
 import java.util.UUID
 
 data class CheckoutState(
-    val input: String = "0", val order: OrderIntent? = null, val invoice: PosInvoice? = null,
+    val input: String = "0", val currency: String = "USD", val order: OrderIntent? = null, val invoice: PosInvoice? = null,
     val invoices: List<PosInvoice> = emptyList(), val offset: Int = 0, val next: Int? = null,
     val historyLoading: Boolean = false, val busy: Boolean = false, val initialized: Boolean = false, val error: String = "", val historyError: String = "",
 )
@@ -30,9 +30,12 @@ class CheckoutViewModel(private val gateway: CheckoutGateway) : ViewModel() {
             catch (e: Exception) { mutable.value = mutable.value.copy(error = "Could not restore the last order: ${e.message}") }
         }
     }
+    fun setCurrency(currency: String) {
+        if (currency in setOf("XMR", "USD")) mutable.value = mutable.value.copy(currency = currency, input = if (mutable.value.order == null) "0" else mutable.value.input)
+    }
     fun key(key: String) {
         val state = mutable.value
-        if (!state.busy && state.initialized && state.order == null) mutable.value = state.copy(input = XmrInput.key(state.input, key), error = "")
+        if (!state.busy && state.initialized && state.order == null) mutable.value = state.copy(input = if (state.currency == "USD") UsdInput.key(state.input, key) else XmrInput.key(state.input, key), error = "")
     }
     fun create() {
         if (mutable.value.busy || !mutable.value.initialized) return
@@ -40,7 +43,7 @@ class CheckoutViewModel(private val gateway: CheckoutGateway) : ViewModel() {
         viewModelScope.launch {
             operations.withLock {
                 try {
-                    val order = mutable.value.order ?: OrderIntent(UUID.randomUUID().toString(), XmrInput.canonical(mutable.value.input))
+                    val order = mutable.value.order ?: OrderIntent(UUID.randomUUID().toString(), if (mutable.value.currency == "USD") UsdInput.cents(mutable.value.input) else XmrInput.canonical(mutable.value.input), mutable.value.currency)
                     // Save BEFORE making a network request. Never replace this ID
                     // automatically, even if the response is lost or the app exits.
                     gateway.saveOrder(order)
@@ -64,7 +67,7 @@ class CheckoutViewModel(private val gateway: CheckoutGateway) : ViewModel() {
                     // order away from its keypad.
                     if (mutable.value.order?.id == order.id) mutable.value = mutable.value.copy(invoice = invoice.copy(stale = invoice.stale || !connected), error = "")
                 } catch (e: CancellationException) { throw e }
-                catch (e: Exception) { mutable.value = mutable.value.copy(invoice = mutable.value.invoice?.copy(stale = true), error = e.message ?: "Status unavailable") }
+                catch (e: Exception) { mutable.value = mutable.value.copy(invoice = mutable.value.invoice?.copy(stale = true), error = mutable.value.error.ifEmpty { e.message ?: "Status unavailable" }) }
             }
         } finally { operations.unlock() }
     }

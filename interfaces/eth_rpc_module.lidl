@@ -1,0 +1,10 @@
+module eth_rpc_module {
+  version "0.1.0"
+  description "Ethereum RPC methods used by Monero Merchant"
+  category "wallet"
+  depends []
+
+  method get_chain_config(chain_id: int) -> tstr
+  method set_chain_config(chain_id: int, config_json: tstr) -> bool
+  method raw_rpc(chain_id: int, method: tstr, params_json: tstr) -> tstr
+}

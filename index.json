@@ -1,11 +1,60 @@
 {
   "schemaVersion": 2,
   "repositoryName": "monero-merchant",
-  "generatedAt": "2026-11-10T17:41:50Z",
+  "generatedAt": "2026-11-16T03:39:10Z",
   "packages": [
     {
       "name": "monero_merchant",
       "versions": [
+        {
+          "releasedAt": "2026-11-16T03:38:26Z",
+          "publisherRef": "monero_merchant-v0.4.0-pre-release",
+          "url": "https://github.com/Monero-Merchant/logos-monero-merchant-module/releases/download/v0.4.0-pre-release/logos-monero_merchant-module-lib.lgx",
+          "size": 5829633,
+          "sha256": "8ee5b1daffb4df0d8a9f7f2c5249a11c5dffe7aa98937fb50117d662702e9391",
+          "rootHash": "08452559a24539e7a3498a2eae442afdef71b2a210e14e3027c1affa08764b26",
+          "manifest": {
+            "author": "",
+            "category": "wallet",
+            "dependencies": [
+              {
+                "name": "monero_wallet_backend",
+                "version": "0.1.1"
+              },
+              {
+                "name": "delivery_module",
+                "version": "0.3.3"
+              },
+              {
+                "name": "libp2p_module",
+                "version": "1.1.0"
+              },
+              {
+                "name": "eth_rpc_module",
+                "version": "0.1.0"
+              }
+            ],
+            "description": "Persistent Stagenet invoices and incoming payments through native Logos IPC",
+            "display_name": "Monero Merchant POS PoC",
+            "hashes": {
+              "assets": "5e28372d1169ac0a2620633c29047c4ce5864c4831d6ad54c92742b784af585c",
+              "root": "08452559a24539e7a3498a2eae442afdef71b2a210e14e3027c1affa08764b26",
+              "variants": "74e0ce08f8a1fdf37624caff8693cd179b070877d622369044ae37eb09d72a2e",
+              "variants/darwin-arm64": "2a247b5f0136994487d7851b0fc9aeb2149d607809fe3a67e1f6bc3db771d6fe"
+            },
+            "icon": "assets/icon.png",
+            "main": {
+              "darwin-arm64": "monero_merchant_plugin.dylib"
+            },
+            "manifestVersion": "0.6.0",
+            "name": "monero_merchant",
+            "type": "core",
+            "version": "0.4.0"
+          },
+          "urls": [
+            "https://github.com/Monero-Merchant/logos-monero-merchant-module/releases/download/v0.4.0-pre-release/logos-monero_merchant-module-lib.lgx"
+          ]
+        },
         {
           "releasedAt": "2026-11-10T17:41:00Z",
           "publisherRef": "monero_merchant-v0.3.0",
@@ -156,6 +205,44 @@
     {
       "name": "monero_merchant_ui",
       "versions": [
+        {
+          "releasedAt": "2026-11-16T03:38:26Z",
+          "publisherRef": "monero_merchant_ui-v0.4.0-pre-release",
+          "url": "https://github.com/Monero-Merchant/logos-monero-merchant-module/releases/download/v0.4.0-pre-release/logos-monero_merchant_ui-module.lgx",
+          "size": 3777670,
+          "sha256": "ca0a666c4d02e34b396c26b1f370e03d556b551c62fae5343da8f3f4be82d457",
+          "rootHash": "9a28b9565cf4e83c00ca1f8ec4a949d733ebb0ac1351f53be74b0abb4ff665d8",
+          "manifest": {
+            "author": "",
+            "category": "wallet",
+            "dependencies": [
+              {
+                "name": "monero_merchant",
+                "version": "0.4.0"
+              }
+            ],
+            "description": "Wallet connection, POS pairing, Stagenet invoices and payment tracking",
+            "display_name": "Monero Merchant",
+            "hashes": {
+              "assets": "38dadc12ae79db4f872f2623585a774ca8e571f6232959f5f17313057f051d58",
+              "root": "9a28b9565cf4e83c00ca1f8ec4a949d733ebb0ac1351f53be74b0abb4ff665d8",
+              "variants": "d413be699c3334be92703f02becab9db959fd21fad88fbf2654f7710e3944bf3",
+              "variants/darwin-arm64": "76ac268a0389287cbfc18ed09b590cf51f60786ea65a9d3cbfa19664f8f635c5"
+            },
+            "icon": "assets/icon.png",
+            "main": {
+              "darwin-arm64": "monero_merchant_ui_plugin.dylib"
+            },
+            "manifestVersion": "0.6.0",
+            "name": "monero_merchant_ui",
+            "type": "ui_qml",
+            "version": "0.4.0",
+            "view": "qml/Main.qml"
+          },
+          "urls": [
+            "https://github.com/Monero-Merchant/logos-monero-merchant-module/releases/download/v0.4.0-pre-release/logos-monero_merchant_ui-module.lgx"
+          ]
+        },
         {
           "releasedAt": "2026-11-10T17:41:00Z",
           "publisherRef": "monero_merchant_ui-v0.3.0",

@@ -14,6 +14,7 @@
 #include <QFile>
 #include <QSaveFile>
 #include <QUrl>
+#include <QTimeZone>
 #include <QDebug>
 #include <nlohmann/json.hpp>
 #include <vector>
@@ -101,6 +102,8 @@ std::string MoneroMerchantImpl::getPriceSettings()
         settings = nlohmann::json::parse(priceSettings_, nullptr, false);
     }
     if (!settings.is_object()) return error("invalid_price_settings", "Price settings could not be read.");
+    if (!settings.contains("eur_feed"))
+        settings["eur_feed"] = settings.value("chain_id", 0) == 42161 ? "0xA14d53bC1F1c0F31B4aA3BD109344E5009051a84" : "";
     try {
         const auto chain = settings.at("chain_id").get<int64_t>();
         logos::CallError callError;
@@ -122,6 +125,7 @@ std::string MoneroMerchantImpl::setPriceSettings(const std::string& settingsJson
         auto input = nlohmann::json::parse(settingsJson);
         const auto chain = input.at("chain_id").get<int64_t>();
         const auto feed = input.at("feed").get<std::string>();
+        const auto eurFeed = input.value("eur_feed", chain == 42161 ? "0xA14d53bC1F1c0F31B4aA3BD109344E5009051a84" : "");
         const auto sequencer = input.at("sequencer").get<std::string>();
         const auto endpoint = input.at("endpoint").get<std::string>();
         const auto age = input.at("max_age_seconds").get<int64_t>();
@@ -132,7 +136,7 @@ std::string MoneroMerchantImpl::setPriceSettings(const std::string& settingsJson
                 s.substr(2).find_first_not_of('0') != std::string::npos;
         };
         const QUrl url(QString::fromStdString(endpoint), QUrl::StrictMode);
-        if (chain <= 0 || chain > 2147483647 || !address(feed) ||
+        if (chain <= 0 || chain > 2147483647 || !address(feed) || (!eurFeed.empty() && !address(eurFeed)) ||
             (!sequencer.empty() && !address(sequencer)) || (chain == 42161 && sequencer.empty()) ||
             age < 1 || age > 604800 || grace < 0 || grace > 604800 ||
             !url.isValid() || url.host().isEmpty() || (url.scheme() != "https" && url.scheme() != "http") ||
@@ -149,7 +153,7 @@ std::string MoneroMerchantImpl::setPriceSettings(const std::string& settingsJson
         rpcConfig["endpoint"] = endpoint;
         const bool saved = modules().eth_rpc_module.set_chain_config(chain, rpcConfig.dump(), &callError, 5000);
         if (!callError.ok() || !saved) return error("rpc_save_failed", "Could not save the shared Ethereum RPC endpoint.");
-        nlohmann::json settings{{"chain_id", chain}, {"feed", feed}, {"sequencer", sequencer},
+        nlohmann::json settings{{"chain_id", chain}, {"feed", feed}, {"eur_feed", eurFeed}, {"sequencer", sequencer},
                                {"max_age_seconds", age}, {"grace_seconds", grace}};
         const auto serialized = settings.dump();
         std::lock_guard<std::mutex> lock(priceSettingsMutex_);
@@ -186,6 +190,7 @@ void MoneroMerchantImpl::onContextReady()
             else priceSettings_ = "invalid";
         } else priceSettings_ = nlohmann::json{{"chain_id", 42161},
             {"feed", "0x8c76E8cab5ef3B410a318DDb82d83Ed47D7d2701"},
+            {"eur_feed", "0xA14d53bC1F1c0F31B4aA3BD109344E5009051a84"},
             {"sequencer", "0xFdB631F5EE196F0ed6FAa767959853A9F217697D"},
             {"max_age_seconds", 3600}, {"grace_seconds", 3600}}.dump();
     }
@@ -266,11 +271,11 @@ void MoneroMerchantImpl::onContextReady()
                     return nlohmann::json::parse(getWalletStatus());
                 if (method == "getInvoices")
                     return nlohmann::json::parse(getInvoices());
-                if (method == "quoteUsd" && args.size() == 1)
+                if ((method == "quoteUsd" || method == "quoteEur") && args.size() == 1)
                 {
                     const auto cents = args[0].get<uint64_t>();
                     if (!cents || cents > 9999999999ULL)
-                        throw std::runtime_error("Invalid USD amount");
+                        throw std::runtime_error("Invalid fiat amount");
                     nlohmann::json settings;
                     {
                         std::lock_guard<std::mutex> lock(priceSettingsMutex_);
@@ -320,10 +325,41 @@ void MoneroMerchantImpl::onContextReady()
                     const auto updated = word(quote, 192);
                     if (!price || !updated || updated > now || now - updated > settings.at("max_age_seconds").get<uint64_t>())
                         throw std::runtime_error("XMR/USD price is unavailable or too old");
-                    const auto atomic = merchant::usdToAtomic(cents, price, decimals);
-                    return nlohmann::json{{"amount_xmr", merchant::xmrAmount(static_cast<uint64_t>(atomic))},
-                                          {"price", std::to_string(price)}, {"decimals", decimals}, {"updated_at", updated},
-                                          {"chain_id", chain}, {"feed", feed}};
+                    uint64_t atomic = 0;
+                    if (method == "quoteUsd") atomic = merchant::usdToAtomic(cents, price, decimals);
+                    nlohmann::json result{{"price", std::to_string(price)}, {"decimals", decimals},
+                                          {"updated_at", updated}, {"chain_id", chain}, {"feed", feed}};
+                    if (method == "quoteEur") {
+                        const auto eurFeed = settings.value("eur_feed", chain == 42161 ? "0xA14d53bC1F1c0F31B4aA3BD109344E5009051a84" : "");
+                        if (eurFeed.empty()) throw std::runtime_error("Configure an EUR/USD feed for this chain");
+                        // This reference feed follows standard forex market hours.
+                        if (chain == 42161 && QString::fromStdString(eurFeed).compare(
+                                QStringLiteral("0xA14d53bC1F1c0F31B4aA3BD109344E5009051a84"), Qt::CaseInsensitive) == 0) {
+                            const QTimeZone eastern("America/New_York");
+                            if (!eastern.isValid()) throw std::runtime_error("Forex market timezone unavailable");
+                            const auto market = QDateTime::currentDateTimeUtc().toTimeZone(eastern);
+                            const int day = market.date().dayOfWeek();
+                            const bool holiday = (market.date().month() == 12 && market.date().day() == 25) ||
+                                                 (market.date().month() == 1 && market.date().day() == 1);
+                            if (holiday || day == 6 || (day == 7 && market.time() < QTime(18, 0)) ||
+                                (day == 5 && market.time() >= QTime(17, 0)))
+                                throw std::runtime_error("EUR/USD forex market is closed");
+                        }
+                        const auto eurDecimals = word(read(eurFeed.c_str(), "0x313ce567"), 0);
+                        if (eurDecimals > 12) throw std::runtime_error("Unsupported EUR/USD oracle precision");
+                        const auto eurQuote = read(eurFeed.c_str(), "0xfeaf968c");
+                        const auto eurPrice = word(eurQuote, 64);
+                        const auto eurUpdated = word(eurQuote, 192);
+                        if (!eurPrice || !eurUpdated || eurUpdated > now || now - eurUpdated > settings.at("max_age_seconds").get<uint64_t>())
+                            throw std::runtime_error("EUR/USD price is unavailable or too old");
+                        atomic = merchant::eurToAtomic(cents, price, decimals, eurPrice, eurDecimals);
+                        result["eur_usd_price"] = std::to_string(eurPrice);
+                        result["eur_usd_decimals"] = eurDecimals;
+                        result["eur_usd_updated_at"] = eurUpdated;
+                        result["eur_usd_feed"] = eurFeed;
+                    }
+                    result["amount_xmr"] = merchant::xmrAmount(atomic);
+                    return result;
                 }
                 if (method == "createPosInvoice" && args.size() == 5)
                     return nlohmann::json::parse(createInvoiceForWallet(args[0], args[1], args[2], args[3], args[4]));

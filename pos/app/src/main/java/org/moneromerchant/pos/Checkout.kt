@@ -8,7 +8,7 @@ data class PosInvoice(
     val id: String, val orderId: String, val amount: String, val received: String,
     val remaining: String, val status: String, val creationState: String, val paymentUri: String,
     val confirmations: Int, val stale: Boolean, val review: Boolean, val createdAt: Long,
-    val usdCents: String? = null, val rate: String? = null,
+    val usdCents: String? = null, val rate: String? = null, val eurRate: String? = null,
 ) {
     val accepted: Boolean get() = !stale && status in setOf("accepted", "paid")
     companion object {
@@ -20,6 +20,9 @@ data class PosInvoice(
             value.optJSONObject("pricing")?.optString("amount_usd_cents"),
             value.optJSONObject("pricing")?.let { pricing ->
                 runCatching { BigDecimal(pricing.getString("price")).movePointLeft(pricing.getInt("decimals")).toPlainString() }.getOrNull()
+            },
+            value.optJSONObject("pricing")?.let { pricing ->
+                runCatching { BigDecimal(pricing.getString("eur_usd_price")).movePointLeft(pricing.getInt("eur_usd_decimals")).toPlainString() }.getOrNull()
             },
         )
     }
@@ -65,7 +68,7 @@ object UsdInput {
         value.matches(Regex("[0-9]{1,8}(\\.[0-9]{0,2})?")) && BigDecimal(value).signum() > 0
     }.getOrDefault(false)
     fun cents(value: String): String {
-        require(valid(value)) { "Enter a positive USD amount with at most two decimal places" }
+        require(valid(value)) { "Enter a positive amount with at most two decimal places" }
         return BigDecimal(value).movePointRight(2).toBigIntegerExact().toString()
     }
 }

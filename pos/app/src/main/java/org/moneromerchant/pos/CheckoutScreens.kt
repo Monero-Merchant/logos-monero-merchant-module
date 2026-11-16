@@ -180,7 +180,7 @@ private fun AmountScreen(state: CheckoutState, online: Boolean, key: (String) ->
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     CheckoutControl(R.drawable.close_24px, "Clear", Modifier.weight(1f).testTag("clearAmount"), !state.busy, Color.White, MaterialTheme.colorScheme.onPrimaryContainer) { key("clear") }
                     CheckoutControl(R.drawable.arrow_back_24px, "Delete", Modifier.weight(1f), !state.busy, MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.colorScheme.onSecondaryContainer) { key("delete") }
-                    CheckoutControl(R.drawable.check_24px, "Charge", Modifier.weight(1f).testTag("createInvoice"), online && state.initialized && !state.busy && (if (state.currency == "USD") UsdInput.valid(state.input) else XmrInput.valid(state.input)), MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.onPrimary, create)
+                    CheckoutControl(R.drawable.check_24px, "Charge", Modifier.weight(1f).testTag("createInvoice"), online && state.initialized && !state.busy && (if (state.currency != "XMR") UsdInput.valid(state.input) else XmrInput.valid(state.input)), MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.onPrimary, create)
                 }
             }
         }
@@ -215,10 +215,11 @@ private fun CheckoutControl(icon: Int, label: String, modifier: Modifier, enable
 private fun InvoiceScreen(state: CheckoutState, newOrder: () -> Unit, retry: () -> Unit, online: Boolean) {
     val invoice = state.invoice
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(18.dp)) {
-        if (state.order?.currency == "USD") {
-            Text("USD ${java.math.BigDecimal(state.order.amount).movePointLeft(2).setScale(2).toPlainString()}", color = Muted)
+        if (state.order?.currency in setOf("USD", "EUR")) {
+            Text("${state.order!!.currency} ${java.math.BigDecimal(state.order.amount).movePointLeft(2).setScale(2).toPlainString()}", color = Muted)
         }
-        if (invoice?.rate != null) Text("Exchange rate: $${invoice.rate} / XMR", color = Muted)
+        if (invoice?.rate != null) Text("XMR/USD: $${invoice.rate}", color = Muted)
+        if (invoice?.eurRate != null) Text("EUR/USD: $${invoice.eurRate}", color = Muted)
         if (invoice?.accepted == true) {
             Text("✓", color = Green, fontSize = 90.sp)
             Text(if (invoice.status == "paid") "Payment confirmed" else "Payment accepted", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.testTag("paymentSuccess"))
@@ -229,7 +230,7 @@ private fun InvoiceScreen(state: CheckoutState, newOrder: () -> Unit, retry: () 
         } else {
             Text(if (invoice?.status == "partial") "Partial payment received" else "Waiting for payment", style = MaterialTheme.typography.headlineMedium)
             if (invoice != null) Text("${XmrInput.display(invoice.remaining)} XMR", fontSize = 30.sp)
-            else Text(if (state.order!!.currency == "USD") "Preparing USD invoice" else "${XmrInput.display(state.order.amount)} XMR", fontSize = 30.sp)
+            else Text(if (state.order!!.currency != "XMR") "Preparing ${state.order.currency} invoice" else "${XmrInput.display(state.order.amount)} XMR", fontSize = 30.sp)
             if (state.busy) CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
             if (invoice != null && invoice.creationState == "ready") {
                 if (!invoice.stale && invoice.paymentUri.isNotBlank() && invoice.status in setOf("pending", "partial")) PaymentQr(invoice.paymentUri)
@@ -278,7 +279,8 @@ private fun TransactionsScreen(state: CheckoutState, loadMore: () -> Unit) {
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text("${XmrInput.display(invoice.amount)} XMR", fontSize = 21.sp)
-                    if (invoice.rate != null) Text("Rate: $${invoice.rate} / XMR", color = Muted, fontSize = 12.sp)
+                    if (invoice.rate != null) Text("XMR/USD: $${invoice.rate}", color = Muted, fontSize = 12.sp)
+                    if (invoice.eurRate != null) Text("EUR/USD: $${invoice.eurRate}", color = Muted, fontSize = 12.sp)
                     Text(invoice.status.replaceFirstChar { it.uppercase() } + if (invoice.stale) " · last known" else "", color = if (invoice.accepted) Green else MaterialTheme.colorScheme.primary)
                     Text("Received ${XmrInput.display(invoice.received)} · remaining ${XmrInput.display(invoice.remaining)} XMR", color = Muted, fontSize = 12.sp)
                     Text("Order ${invoice.orderId.take(8)} · ${DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(invoice.createdAt))}", color = Muted, fontSize = 11.sp)

@@ -48,7 +48,7 @@ fun TerminalSettingsScreen(
                     OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth(),
                         enabled = state.approved) { Text(currency) }
                     DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                        listOf("USD", "XMR").forEach { option ->
+                        listOf("USD", "EUR", "XMR").forEach { option ->
                             DropdownMenuItem(text = { Text(option) }, onClick = { expanded = false; setCurrency(option) })
                         }
                     }

@@ -31,11 +31,11 @@ class CheckoutViewModel(private val gateway: CheckoutGateway) : ViewModel() {
         }
     }
     fun setCurrency(currency: String) {
-        if (currency in setOf("XMR", "USD")) mutable.value = mutable.value.copy(currency = currency, input = if (mutable.value.order == null) "0" else mutable.value.input)
+        if (currency in setOf("XMR", "USD", "EUR")) mutable.value = mutable.value.copy(currency = currency, input = if (mutable.value.order == null) "0" else mutable.value.input)
     }
     fun key(key: String) {
         val state = mutable.value
-        if (!state.busy && state.initialized && state.order == null) mutable.value = state.copy(input = if (state.currency == "USD") UsdInput.key(state.input, key) else XmrInput.key(state.input, key), error = "")
+        if (!state.busy && state.initialized && state.order == null) mutable.value = state.copy(input = if (state.currency != "XMR") UsdInput.key(state.input, key) else XmrInput.key(state.input, key), error = "")
     }
     fun create() {
         if (mutable.value.busy || !mutable.value.initialized) return
@@ -43,7 +43,7 @@ class CheckoutViewModel(private val gateway: CheckoutGateway) : ViewModel() {
         viewModelScope.launch {
             operations.withLock {
                 try {
-                    val order = mutable.value.order ?: OrderIntent(UUID.randomUUID().toString(), if (mutable.value.currency == "USD") UsdInput.cents(mutable.value.input) else XmrInput.canonical(mutable.value.input), mutable.value.currency)
+                    val order = mutable.value.order ?: OrderIntent(UUID.randomUUID().toString(), if (mutable.value.currency != "XMR") UsdInput.cents(mutable.value.input) else XmrInput.canonical(mutable.value.input), mutable.value.currency)
                     // Save BEFORE making a network request. Never replace this ID
                     // automatically, even if the response is lost or the app exits.
                     gateway.saveOrder(order)

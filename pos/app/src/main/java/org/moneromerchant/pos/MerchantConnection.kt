@@ -115,7 +115,7 @@ class MerchantConnection(private val store: SecureStore) : CheckoutGateway {
         }
     }
     private fun orderArgs(order: OrderIntent): JSONObject = JSONObject().put("order_id", order.id)
-        .put("currency", order.currency).put(if (order.currency == "USD") "amount_usd_cents" else "amount_xmr", order.amount)
+        .put("currency", order.currency).put(when (order.currency) { "EUR" -> "amount_eur_cents"; "USD" -> "amount_usd_cents"; else -> "amount_xmr" }, order.amount)
     private suspend fun invoiceRequest(type: String, args: JSONObject, scope: Pair<String, String>? = null): JSONObject = withContext(Dispatchers.IO) {
         lock.withLock {
             validateScope(scope)

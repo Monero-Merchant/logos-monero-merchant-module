@@ -58,8 +58,8 @@ GridLayout {
         objectName: "priceSettingsCard"
         Layout.fillWidth: true; Layout.preferredWidth: 650; Layout.alignment: Qt.AlignTop
         Layout.columnSpan: root.columns
-        MerchantText { text: "USD price feed"; color: MerchantStyle.MerchantTheme.ink; font.pixelSize: 18; font.weight: Font.DemiBold; Layout.fillWidth: true }
-        MerchantText { text: "Configure the XMR/USD feed used for new USD orders. The RPC endpoint is shared with other apps using this chain."; Layout.fillWidth: true }
+        MerchantText { text: "Currency price feeds"; color: MerchantStyle.MerchantTheme.ink; font.pixelSize: 18; font.weight: Font.DemiBold; Layout.fillWidth: true }
+        MerchantText { text: "Configure the feeds used for new USD and EUR orders. The RPC endpoint is shared with other apps using this chain."; Layout.fillWidth: true }
         Connections {
             target: root.controller
             function onPriceSettingsChanged() {
@@ -68,6 +68,7 @@ GridLayout {
                 endpoint.text = s.endpoint || ""
                 chain.text = String(s.chain_id)
                 feed.text = s.feed || ""
+                eurFeed.text = s.eur_feed || ""
                 sequencer.text = s.sequencer || ""
                 maxAge.text = String(s.max_age_seconds)
                 grace.text = String(s.grace_seconds)
@@ -79,6 +80,8 @@ GridLayout {
         MerchantField { id: chain; objectName: "priceChain"; Layout.fillWidth: true; inputMethodHints: Qt.ImhDigitsOnly; enabled: !root.controller.priceBusy }
         MerchantText { text: "XMR/USD feed contract"; Layout.fillWidth: true }
         MerchantField { id: feed; objectName: "priceFeed"; Layout.fillWidth: true; enabled: !root.controller.priceBusy }
+        MerchantText { text: "EUR/USD feed contract"; Layout.fillWidth: true }
+        MerchantField { id: eurFeed; objectName: "priceEurFeed"; Layout.fillWidth: true; enabled: !root.controller.priceBusy }
         MerchantText { text: "Sequencer uptime contract"; Layout.fillWidth: true }
         MerchantField { id: sequencer; objectName: "priceSequencer"; Layout.fillWidth: true; enabled: !root.controller.priceBusy }
         MerchantText { text: "Leave the sequencer contract empty only for a chain that does not require a sequencer check."; font.pixelSize: 12; Layout.fillWidth: true }
@@ -97,7 +100,7 @@ GridLayout {
                         root.controller.priceError = "Enter whole numbers for chain ID and time limits."; return
                     }
                     root.controller.savePriceSettings({endpoint: endpoint.text.trim(), chain_id: Number(chain.text),
-                        feed: feed.text.trim(), sequencer: sequencer.text.trim(),
+                        feed: feed.text.trim(), eur_feed: eurFeed.text.trim(), sequencer: sequencer.text.trim(),
                         max_age_seconds: Number(maxAge.text), grace_seconds: Number(grace.text)})
                 }
             }

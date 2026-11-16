@@ -369,12 +369,12 @@ Json Service::invoice(const std::string& peer, const std::string& operation, con
             const auto order = args.at("order_id").get<std::string>();
             require(uuid(order), "Invalid order ID");
             const auto currency = args.value("currency", std::string("XMR"));
-            require(currency == "XMR" || currency == "USD", "Unsupported currency");
-            const auto original = currency == "USD" ? args.at("amount_usd_cents").get<std::string>() :
+            require(currency == "XMR" || currency == "USD" || currency == "EUR", "Unsupported currency");
+            const auto original = currency != "XMR" ? args.at(currency == "EUR" ? "amount_eur_cents" : "amount_usd_cents").get<std::string>() :
                 merchant::xmrAmount(merchant::atomicNumber(merchant::parseXmrAmount(args.at("amount_xmr").get<std::string>())));
-            if (currency == "USD")
+            if (currency != "XMR")
                 require(!original.empty() && original.size() <= 10 && original.find_first_not_of("0123456789") == std::string::npos &&
-                        original[0] != '0', "Invalid USD amount");
+                        original[0] != '0', "Invalid fiat amount");
             const auto backendId = "pos-" + digest(peer + ":" + order);
             Json saved;
             {
@@ -389,8 +389,8 @@ Json Service::invoice(const std::string& peer, const std::string& operation, con
                             snapshot["wallet"].value("connected", false) &&
                             snapshot["wallet"].value("synchronized", false),
                         "Wait for a synchronized merchant wallet");
-                if (currency == "USD") quote = backend_("quoteUsd", Json::array({std::stoull(original)}));
-                const auto converted = currency == "USD" ? quote.at("amount_xmr").get<std::string>() : original;
+                if (currency != "XMR") quote = backend_(currency == "EUR" ? "quoteEur" : "quoteUsd", Json::array({std::stoull(original)}));
+                const auto converted = currency != "XMR" ? quote.at("amount_xmr").get<std::string>() : original;
                 std::lock_guard<std::mutex> lock(mutex_);
                 require(status(peer) == "approved", "Terminal access changed");
                 saved = one("SELECT * FROM orders WHERE peer_id=? AND order_id=?", {peer, order});
@@ -398,7 +398,7 @@ Json Service::invoice(const std::string& peer, const std::string& operation, con
                 {
                     query("INSERT INTO orders(peer_id,order_id,backend_id,amount_xmr,wallet_id,created_at,currency,original_amount,quote) VALUES(?,?,?,?,?,?,?,?,?)",
                           {peer, order, backendId, converted, wallet, now() * 1000, currency, original,
-                           currency == "USD" ? quote.dump() : std::string()});
+                           currency != "XMR" ? quote.dump() : std::string()});
                     saved = one("SELECT * FROM orders WHERE peer_id=? AND order_id=?", {peer, order});
                 }
             }
@@ -407,10 +407,10 @@ Json Service::invoice(const std::string& peer, const std::string& operation, con
             require(saved["wallet_id"] == wallet, "Return to the original merchant wallet for this order");
             const auto amount = saved.at("amount_xmr").get<std::string>();
             std::string pricingJson;
-            if (currency == "USD") {
+            if (currency != "XMR") {
                 auto pricing = Json::parse(saved.at("quote").get<std::string>());
-                pricing["currency"] = "USD";
-                pricing["amount_usd_cents"] = original;
+                pricing["currency"] = currency;
+                pricing[currency == "EUR" ? "amount_eur_cents" : "amount_usd_cents"] = original;
                 pricingJson = pricing.dump();
             }
             // Backend validates this expected wallet atomically with invoice reservation.

@@ -35,9 +35,13 @@ Panel {
     }
     MerchantText {
         objectName: "invoiceExchangeRate"
-        visible: !!root.invoice && !!root.invoice.pricing && root.invoice.pricing.currency === "USD"
-        text: visible ? "Sale: $" + root.decimalUnits(root.invoice.pricing.amount_usd_cents, 2) +
-            " · Rate: $" + root.decimalUnits(root.invoice.pricing.price, root.invoice.pricing.decimals) + " / XMR" : ""
+        visible: !!root.invoice && !!root.invoice.pricing && ["USD", "EUR"].indexOf(root.invoice.pricing.currency) >= 0
+        text: visible ? (root.invoice.pricing.currency === "EUR"
+            ? "Sale: €" + root.decimalUnits(root.invoice.pricing.amount_eur_cents, 2) +
+              " · XMR/USD: $" + root.decimalUnits(root.invoice.pricing.price, root.invoice.pricing.decimals) +
+              " · EUR/USD: $" + root.decimalUnits(root.invoice.pricing.eur_usd_price, root.invoice.pricing.eur_usd_decimals)
+            : "Sale: $" + root.decimalUnits(root.invoice.pricing.amount_usd_cents, 2) +
+              " · Rate: $" + root.decimalUnits(root.invoice.pricing.price, root.invoice.pricing.decimals) + " / XMR") : ""
         Layout.fillWidth: true; color: MerchantStyle.MerchantTheme.ink
     }
     Rectangle {
